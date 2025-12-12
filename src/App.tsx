@@ -69,13 +69,13 @@ const diagramImages: Record<string, string[]> = {
 
 const diagramsList = [
   { id: 'home', title: 'Inicio', steps: 1 },
-  { id: 'global-user-mgmt', title: 'Gestión Global de Usuario', steps: 35 + 3 },
-  { id: 'recipe-mgmt', title: 'Administración de Recetas', steps: 37 + 3 },
-  { id: 'share-recipe', title: 'Compartir Recetas', steps: 30 + 3 },
+  { id: 'global-user-mgmt', title: 'Gestión Global de Usuario', steps: 36 + 3 },
+  { id: 'recipe-mgmt', title: 'Administración de Recetas', steps: 38 + 3 },
+  { id: 'share-recipe', title: 'Compartir Recetas', steps: 31 + 3 },
   { id: 'favorites-ratings', title: 'Favoritos y Valoraciones', steps: 75 + 3 },
-  { id: 'search-discover', title: 'Buscar y Descubrir', steps: 22 + 3 },
-  { id: 'weekly-planning', title: 'Planificación Semanal', steps: 56 + 3 },
-  { id: 'shopping-list', title: 'Crear Listas de la Compra', steps: 34 + 3 },
+  { id: 'search-discover', title: 'Buscar y Descubrir', steps: 23 + 3 },
+  { id: 'weekly-planning', title: 'Planificación Semanal', steps: 57 + 3 },
+  { id: 'shopping-list', title: 'Crear Listas de la Compra', steps: 35 + 3 },
   { id: 'main-sequence', title: 'Moderación de Contenido', steps: 19 + 3 },
   { id: 'acknowledgments', title: 'Agradecimientos', steps: 0 },
 ];
@@ -322,11 +322,11 @@ export default function App() {
   // Mapas de enfoque para autoscroll
   const focusPointsHome = { 0: 0, 1: 0 };
   const focusPointsMain = { 0: 0, 1: 130, 2: 180, 3: 325, 4: 400, 5: 430, 6: 500, 7: 640, 8: 600, 9: 670, 10: 740, 11: 840, 12: 870, 13: 950, 14: 1060, 15: 1080, 16: 1120, 17: 1200, 18: 1430, 19: 0 };
-  const focusPointsGlobalUser = { 0: 0, 1: 100, 2: 150, 3: 200, 4: 250, 5: 350, 6: 400, 7: 500, 8: 600, 9: 650, 10: 750, 11: 800, 12: 850, 13: 850, 14: 1000, 15: 1150, 16: 1250, 17: 1350, 18: 1400, 19: 1500, 20: 1550, 21: 1700, 22: 1900, 23: 1950, 24: 2200, 25: 2350, 26: 2600, 27: 2700, 28: 2950, 29: 3200, 30: 3350, 31: 3350, 32: 3450, 33: 3600, 34: 3700, 35: 0 };
-  const focusPointsRecipe = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 100, 7: 150, 8: 200, 9: 250, 10: 350, 11: 400, 12: 450, 13: 500, 14: 550, 15: 600, 16: 650, 17: 750, 18: 800, 19: 850, 20: 900, 21: 950, 22: 1000, 23: 1050, 24: 1100, 25: 1150, 26: 1200, 27: 1250, 28: 1350, 29: 1400, 30: 1450, 31: 1500, 32: 1550, 33: 1600, 34: 1700, 35: 1750, 36: 1800, 37: 0 };
-  const focusPointsSearch = { 0: 0, 1: 100, 2: 150, 3: 250, 4: 350, 5: 450, 6: 550, 7: 650, 8: 750, 9: 850, 10: 950, 11: 1000, 12: 1050, 13: 1100, 14: 1150, 15: 1200, 16: 1250, 17: 1300, 18: 1350, 19: 1400, 20: 1450, 21: 1500, 22: 0 };
+  const focusPointsGlobalUser = { 0: 0, 1: 100, 2: 150, 3: 200, 4: 250, 5: 350, 6: 400, 7: 500, 8: 600, 9: 650, 10: 750, 11: 800, 12: 850, 13: 850, 14: 1000, 15: 1150, 16: 1250, 17: 1350, 18: 1400, 19: 1500, 20: 1550, 21: 1700, 22: 1900, 23: 1950, 24: 2200, 25: 2350, 26: 2600, 27: 2700, 28: 2950, 29: 3200, 30: 3350, 31: 3350, 32: 3450, 33: 3600, 34: 3700, 35: 0, 36: 0 };
+  const focusPointsRecipe = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 100, 7: 150, 8: 200, 9: 250, 10: 350, 11: 400, 12: 450, 13: 500, 14: 550, 15: 600, 16: 650, 17: 750, 18: 800, 19: 850, 20: 900, 21: 950, 22: 1000, 23: 1050, 24: 1100, 25: 1150, 26: 1200, 27: 1250, 28: 1350, 29: 1400, 30: 1450, 31: 1500, 32: 1550, 33: 1600, 34: 1700, 35: 1750, 36: 1800, 37: 0, 38: 0 };
+  const focusPointsSearch = { 0: 0, 1: 100, 2: 150, 3: 250, 4: 350, 5: 450, 6: 550, 7: 650, 8: 750, 9: 850, 10: 950, 11: 1000, 12: 1050, 13: 1100, 14: 1150, 15: 1200, 16: 1250, 17: 1300, 18: 1350, 19: 1400, 20: 1450, 21: 1500, 22: 0, 23: 0 };
   const focusPointsShoppingList = { 0: 0, 1: 130, 2: 150, 3: 180, 4: 200, 5: 260, 6: 280, 7: 360, 8: 460, 9: 560, 10: 570, 11: 640, 12: 660, 13: 670, 14: 680, 15: 700, 16: 720, 17: 740, 18: 760, 19: 800, 20: 830, 21: 850, 22: 880, 23: 890, 24: 920, 25: 940, 26: 960, 27: 1200, 28: 1250, 29: 1320, 30: 1350, 31: 1380, 32: 1550, 33: 1580, 34: 1620, 35: 0 };
-  const focusPointsShare = { 0: 0, 1: 130, 2: 160, 3: 180, 4: 200, 5: 260, 6: 280, 7: 320, 8: 340, 9: 400, 10: 420, 11: 450, 12: 480, 13: 500, 14: 530, 15: 600, 16: 620, 17: 640, 18: 670, 19: 700, 20: 750, 21: 780, 22: 800, 23: 830, 24: 900, 25: 930, 26: 950, 27: 1050, 28: 1070, 29: 1100, 30: 1130 };
+  const focusPointsShare = { 0: 0, 1: 130, 2: 160, 3: 180, 4: 200, 5: 260, 6: 280, 7: 320, 8: 340, 9: 400, 10: 420, 11: 450, 12: 480, 13: 500, 14: 530, 15: 600, 16: 620, 17: 640, 18: 670, 19: 700, 20: 750, 21: 780, 22: 800, 23: 830, 24: 900, 25: 930, 26: 950, 27: 1050, 28: 1070, 29: 1100, 30: 1130, 31: 0 };
   const focusPointsFavorites = { 0: 0, 1: 130, 2: 160, 3: 200, 4: 220, 5: 250, 6: 280, 7: 350, 8: 380, 9: 400, 10: 420, 11: 450, 12: 480, 13: 500, 14: 520, 15: 600, 16: 620, 17: 640, 18: 660, 19: 680, 20: 700, 21: 780, 22: 800, 23: 820, 24: 840, 25: 860, 26: 880, 27: 900, 28: 920, 29: 1000, 30: 1020, 31: 1060, 32: 1080, 33: 1170, 34: 1190, 35: 1260, 36: 1280, 37: 1300, 38: 1370, 39: 1390, 40: 1480, 41: 1500, 42: 1570, 43: 1590, 44: 1610, 45: 1680, 46: 1700, 47: 1790, 48: 1810, 49: 1880, 50: 1900, 51: 1920, 52: 2030, 53: 2050, 54: 2120, 55: 2140, 56: 2350, 57: 2360, 58: 2370, 59: 2390, 60: 2410, 61: 2450, 62: 2470, 63: 2610, 64: 2610, 65: 2620, 66: 2640, 67: 2660, 68: 2710, 69: 2730, 70: 2760, 71: 2770, 72: 2790, 73: 2810, 74: 2850, 75: 0 };
   const focusPointsWeeklyPlanning = {
     0: 0, 1: 100, 2: 130, 3: 150, 4: 180, 5: 200,
@@ -334,7 +334,7 @@ export default function App() {
     13: 450, 14: 480, 15: 500, 16: 520, 17: 550, 18: 580, 19: 600, 20: 620, 21: 650,
     22: 750, 23: 800, 24: 850, 25: 900, 26: 950, 27: 1000, 28: 1050, 29: 1100, 30: 1150,
     31: 1200, 32: 1250, 33: 1300, 34: 1350, 35: 1400, 36: 1450, 37: 1550, 38: 1600, 39: 1650, 40: 1700, 41: 1750,
-    42: 1730, 43: 1770, 44: 1780, 45: 1790, 46: 1810, 47: 1840, 48: 1860, 49: 1880, 50: 1920, 51: 1940, 52: 1960, 53: 2000, 54: 2020, 55: 2040, 56: 0
+    42: 1730, 43: 1770, 44: 1780, 45: 1790, 46: 1810, 47: 1840, 48: 1860, 49: 1880, 50: 1920, 51: 1940, 52: 1960, 53: 2000, 54: 2020, 55: 2040, 56: 0, 57: 0
   };
 
   // New Focus Points
@@ -1919,19 +1919,19 @@ export default function App() {
             )}
 
             {activeDiagram.id === 'shopping-list' && (
-              globalStep === totalSteps ? renderShoppingListCreation() : renderShoppingListCreation()
+              globalStep === totalSteps ? renderWebEmbed() : renderShoppingListCreation()
             )}
 
             {activeDiagram.id === 'share-recipe' && (
-              globalStep === totalSteps ? renderShareRecipe() : renderShareRecipe()
+              globalStep === totalSteps ? renderWebEmbed() : renderShareRecipe()
             )}
 
             {activeDiagram.id === 'favorites-ratings' && (
-              globalStep === totalSteps ? renderFavoritesRatings() : renderFavoritesRatings()
+              globalStep === totalSteps ? renderWebEmbed() : renderFavoritesRatings()
             )}
 
             {activeDiagram.id === 'weekly-planning' && (
-              globalStep === totalSteps ? renderWeeklyPlanning() : renderWeeklyPlanning()
+              globalStep === totalSteps ? renderWebEmbed() : renderWeeklyPlanning()
             )}
           </>
         )}
