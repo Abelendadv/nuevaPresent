@@ -1,0 +1,1416 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  ArrowRight, ArrowLeft, Play, RefreshCw, User, Shield, Server, Database, FileText, 
+  CheckCircle, XCircle, AlertTriangle, Circle, Box, Menu, X, Globe, ExternalLink,
+  Timer, PlayCircle, PauseCircle, RotateCcw, Settings, Layout, Users, BookOpen, Utensils,
+  List, ClipboardList, Cpu, Search, ShoppingCart, Share2, Mail, Globe2, Star, Heart,
+  CreditCard, Truck, Package
+} from 'lucide-react';
+
+// --- CONFIGURACIÓN ---
+const FINAL_WEB_URL = "https://www.wikipedia.org"; 
+
+const diagramsList = [
+  { id: 'main-sequence', title: 'Moderación de Contenido', steps: 19 },
+  { id: 'global-user-mgmt', title: 'Gestión Global de Usuario', steps: 30 }, 
+  { id: 'recipe-mgmt', title: 'Administración de Recetas', steps: 37 }, 
+  { id: 'search-discover', title: 'Buscar y Descubrir', steps: 22 },
+  { id: 'shopping-list', title: 'Crear Listas de la Compra', steps: 34 },
+  { id: 'share-recipe', title: 'Compartir Recetas', steps: 30 },
+  { id: 'favorites-ratings', title: 'Favoritos y Valoraciones', steps: 52 },
+  // NUEVO: Flujo de Checkout / Carrito funcional
+  { id: 'shopping-cart', title: 'Carrito de la Compra (Checkout)', steps: 26 }, 
+];
+
+// --- COMPONENTES AUXILIARES ---
+
+const Lifeline = ({ x, height, label, subLabel, icon: Icon, color = "text-blue-400", type = "actor" }) => (
+  <g className="transition-all duration-500">
+    <foreignObject x={x - 60} y={0} width={120} height={90}>
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className={`relative z-10 flex items-center justify-center`}>
+            {type === 'boundary' && (
+                 <div className="w-10 h-10 rounded-full border-2 border-slate-400 bg-slate-900 flex items-center justify-center relative shadow-lg shadow-blue-900/20">
+                    <div className="absolute -left-2 top-1/2 w-4 h-[2px] bg-slate-400"></div>
+                    <Icon className={`w-5 h-5 ${color}`} />
+                 </div>
+            )}
+            {type === 'control' && (
+                 <div className="w-10 h-10 rounded-full border-2 border-slate-400 bg-slate-900 flex items-center justify-center relative shadow-lg shadow-blue-900/20">
+                    <div className="absolute top-0 w-3 h-3 border-t-2 border-r-2 border-slate-400 transform rotate-45"></div>
+                    <Icon className={`w-5 h-5 ${color}`} />
+                 </div>
+            )}
+            {type === 'entity' && (
+                 <div className="w-10 h-10 border-b-2 border-slate-400 bg-slate-900 flex items-center justify-center relative shadow-lg shadow-blue-900/20">
+                     <div className="w-8 h-8 rounded-full border-2 border-slate-400"></div>
+                     <span className={`absolute text-[10px] font-bold ${color}`}>M</span>
+                 </div>
+            )}
+            {type === 'actor' && (
+                <div className={`p-2 drop-shadow-lg`}>
+                   <User className={`w-10 h-10 ${color}`} />
+                </div>
+            )}
+            {type === 'object' && (
+                <div className="w-24 h-10 border-2 border-slate-400 bg-slate-800 flex items-center justify-center relative shadow-lg rounded-sm">
+                    <span className={`text-[10px] font-bold ${color} px-1 text-center leading-tight`}>{label}</span>
+                </div>
+            )}
+        </div>
+        
+        {type !== 'object' && (
+            <div className="flex flex-col items-center mt-1">
+                <span className={`text-[10px] font-bold ${color} underline decoration-1 underline-offset-2`}>{label}</span>
+                {subLabel && <span className="text-[8px] text-slate-400">{subLabel}</span>}
+            </div>
+        )}
+      </div>
+    </foreignObject>
+    <line 
+      x1={x} y1={90} x2={x} y2={height} 
+      stroke="#64748b" 
+      strokeWidth="1.5" 
+      strokeDasharray="6 6" 
+      className="opacity-40"
+    />
+  </g>
+);
+
+const Message = ({ fromX, toX, y, label, isReturn = false, isSelf = false, show }) => {
+  if (!show) return null;
+
+  return (
+    <g className="message-animation">
+      <foreignObject x={Math.min(fromX, toX) + (isSelf ? 0 : 10)} y={y - 20} width={Math.max(Math.abs(toX - fromX) - 20, 180)} height={25}>
+        <div className={`text-[11px] text-center ${isReturn ? 'text-slate-400' : 'text-white font-medium'} px-1 leading-tight whitespace-nowrap overflow-visible drop-shadow-md`}>
+          {label}
+        </div>
+      </foreignObject>
+
+      <path
+        d={`M ${fromX} ${y} L ${toX} ${y}`}
+        fill="none"
+        stroke={isReturn ? "#94a3b8" : "#38bdf8"}
+        strokeWidth={isReturn ? "1.5" : "2"}
+        strokeDasharray={isReturn ? "6 4" : "0"}
+        markerEnd={isReturn ? "url(#arrowhead-open)" : "url(#arrowhead-filled)"}
+        className="animate-draw filter drop-shadow-sm"
+      />
+    </g>
+  );
+};
+
+const ActivationBox = ({ x, y, height, show }) => {
+  if (!show) return null;
+  return (
+    <rect
+      x={x - 6}
+      y={y}
+      width={12}
+      height={height}
+      fill="#bae6fd"
+      stroke="#0284c7"
+      strokeWidth="1"
+      className="animate-fade-in shadow-sm opacity-90"
+    />
+  );
+};
+
+const GroupFrame = ({ x, y, width, height, type, label, show }) => {
+    if (!show) return null;
+    const isLoop = type.toLowerCase() === 'loop';
+    const isAlt = type.toLowerCase() === 'alt';
+    const isRef = type.toLowerCase() === 'ref';
+    
+    let strokeColor = "#84cc16"; // Default green
+    if (isLoop) strokeColor = "#f59e0b"; // Orange
+    if (isAlt) strokeColor = "#3b82f6"; // Blue
+    if (isRef) strokeColor = "#a855f7"; // Purple
+
+    return (
+        <g className="animate-fade-in">
+            <rect 
+                x={x} y={y} width={width} height={height} 
+                fill={isRef ? "white" : "rgba(255,255,255,0.02)"} 
+                stroke={strokeColor} 
+                strokeWidth="1.5" 
+                rx="4"
+            />
+            <path d={`M ${x} ${y} L ${x + 50} ${y} L ${x + 50} ${y + 15} L ${x + 40} ${y + 25} L ${x} ${y + 25} Z`} 
+                  fill={strokeColor} 
+                  stroke="none" 
+                  className="opacity-90" />
+            <text x={x + 5} y={y + 16} fontSize="11" fontWeight="bold" fill="#000">{type}</text>
+            <text x={x + 60} y={y + 16} fontSize="11" fontWeight="bold" fill={strokeColor}>[{label}]</text>
+            {isRef && (
+                 <text x={x + width/2} y={y + height/2 + 5} textAnchor="middle" fontSize="12" fill="#3b82f6" className="underline font-bold">
+                    {label}
+                 </text>
+            )}
+        </g>
+    );
+};
+
+const AltDivider = ({ x, y, width, label, show }) => {
+    if (!show) return null;
+    return (
+        <g className="animate-fade-in">
+            <line x1={x} y1={y} x2={x + width} y2={y} stroke="#3b82f6" strokeWidth="1" strokeDasharray="4 4" />
+             <text x={x + 10} y={y + 14} fontSize="11" fontWeight="bold" fill="#3b82f6">[{label}]</text>
+        </g>
+    )
+}
+
+// --- COMPONENTE PRINCIPAL ---
+export default function App() {
+  const [step, setStep] = useState(0);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeDiagram, setActiveDiagram] = useState(diagramsList[0]);
+  
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+
+  const scrollContainerRef = useRef(null); 
+  const svgRef = useRef(null);
+
+  const totalSteps = activeDiagram.steps;
+
+  // Lógica del Cronómetro
+  useEffect(() => {
+    let interval = null;
+    if (isTimerRunning) {
+      interval = setInterval(() => {
+        setTimerSeconds(prev => prev + 1);
+      }, 1000);
+    } else if (!isTimerRunning && timerSeconds !== 0) {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning, timerSeconds]);
+
+  const formatTime = (totalSeconds) => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const getTimerStyle = () => {
+    if (timerSeconds >= 160) {
+        return "text-red-500 font-bold"; 
+    } else if (timerSeconds >= 140) {
+        return "text-red-500 font-bold animate-pulse"; 
+    } else {
+        return "text-slate-200"; 
+    }
+  };
+
+  const toggleTimer = () => setIsTimerRunning(!isTimerRunning);
+  const resetTimer = () => {
+    setIsTimerRunning(false);
+    setTimerSeconds(0);
+  };
+
+  // Mapas de enfoque para autoscroll
+  const focusPointsMain = { 0: 0, 1: 130, 2: 180, 3: 325, 4: 400, 5: 430, 6: 500, 7: 640, 8: 600, 9: 670, 10: 740, 11: 840, 12: 870, 13: 950, 14: 1060, 15: 1080, 16: 1120, 17: 1200, 18: 1430, 19: 0 };
+  const focusPointsGlobalUser = { 0: 0, 1: 100, 2: 150, 3: 200, 4: 250, 5: 350, 6: 400, 7: 500, 8: 600, 9: 650, 10: 750, 11: 800, 12: 850, 13: 850, 14: 1000, 15: 1150, 16: 1250, 17: 1350, 18: 1400, 19: 1500, 20: 1550, 21: 1700, 22: 1950, 23: 2200, 24: 2300, 25: 2500, 26: 2600, 27: 2800, 28: 2850, 29: 2900, 30: 0 };
+  const focusPointsRecipe = { 0: 0, 1: 100, 2: 150, 3: 200, 4: 250, 5: 350, 6: 400, 7: 450, 8: 500, 9: 550, 10: 600, 11: 650, 12: 750, 13: 800, 14: 850, 15: 900, 16: 950, 17: 1000, 18: 1050, 19: 1100, 20: 1150, 21: 1200, 22: 1250, 23: 1350, 24: 1400, 25: 1450, 26: 1500, 27: 1550, 28: 1600, 29: 1700, 30: 1750, 31: 1800, 32: 1850, 33: 1900, 34: 1950, 35: 2000, 36: 2100, 37: 0 };
+  const focusPointsSearch = { 0: 0, 1: 100, 2: 150, 3: 250, 4: 350, 5: 450, 6: 550, 7: 650, 8: 750, 9: 850, 10: 950, 11: 1000, 12: 1050, 13: 1100, 14: 1150, 15: 1200, 16: 1250, 17: 1300, 18: 1350, 19: 1400, 20: 1450, 21: 1500, 22: 0 };
+  const focusPointsShoppingList = { 0: 0, 1: 130, 2: 150, 3: 180, 4: 200, 5: 260, 6: 280, 7: 360, 8: 460, 9: 560, 10: 570, 11: 640, 12: 660, 13: 670, 14: 680, 15: 700, 16: 720, 17: 740, 18: 760, 19: 800, 20: 830, 21: 850, 22: 880, 23: 890, 24: 920, 25: 940, 26: 960, 27: 1200, 28: 1250, 29: 1320, 30: 1350, 31: 1380, 32: 1550, 33: 1580, 34: 1620, 35: 0 };
+  const focusPointsShare = { 0: 0, 1: 130, 2: 160, 3: 180, 4: 200, 5: 260, 6: 280, 7: 320, 8: 340, 9: 400, 10: 420, 11: 450, 12: 480, 13: 500, 14: 530, 15: 600, 16: 620, 17: 640, 18: 670, 19: 700, 20: 750, 21: 780, 22: 800, 23: 830, 24: 900, 25: 930, 26: 950, 27: 1050, 28: 1070, 29: 1100, 30: 1130 };
+  const focusPointsFavorites = { 0: 0, 1: 130, 2: 160, 3: 200, 4: 220, 5: 250, 6: 280, 7: 350, 8: 380, 9: 400, 10: 420, 11: 450, 12: 480, 13: 500, 14: 520, 15: 600, 16: 620, 17: 640, 18: 660, 19: 680, 20: 700, 21: 780, 22: 800, 23: 820, 24: 840, 25: 860, 26: 880, 27: 900, 28: 920, 29: 1000, 30: 1020, 31: 1100, 32: 1120, 33: 1200, 34: 1220, 35: 1250, 36: 1270, 37: 1300, 38: 1400, 39: 1420, 40: 1500, 41: 1520, 42: 1550, 43: 1570, 44: 1600, 45: 1700, 46: 1720, 47: 1800, 48: 1820, 49: 1850, 50: 1870, 51: 1900, 52: 1980, 53: 2050, 54: 2100, 55: 2150, 56: 2200, 57: 2300, 58: 2350, 59: 2400, 60: 2450, 61: 2500, 62: 2550, 63: 2600, 64: 2650, 65: 2700, 66: 2750, 67: 2800, 68: 2850, 69: 2900, 70: 2950, 71: 3000, 72: 3050, 73: 3100, 74: 3150, 75: 0 };
+  
+  // New Focus Points
+  const focusPointsShoppingCart = {
+    0: 0, 1: 130, 2: 150, 3: 200, 4: 220, 
+    5: 300, 6: 320, 7: 350, 8: 380, 9: 400,
+    10: 450, 11: 470, 12: 500, 13: 530,
+    14: 650, 15: 670, 16: 700, 17: 730, 18: 750,
+    19: 800, 20: 820, 21: 850, 22: 900,
+    23: 1000, 24: 1030, 25: 1060, 26: 0
+  };
+
+  useEffect(() => {
+    if (scrollContainerRef.current && step < totalSteps) {
+        const scrollContainer = scrollContainerRef.current;
+        let currentPoints;
+        if (activeDiagram.id === 'main-sequence') currentPoints = focusPointsMain;
+        else if (activeDiagram.id === 'global-user-mgmt') currentPoints = focusPointsGlobalUser;
+        else if (activeDiagram.id === 'recipe-mgmt') currentPoints = focusPointsRecipe;
+        else if (activeDiagram.id === 'search-discover') currentPoints = focusPointsSearch;
+        else if (activeDiagram.id === 'shopping-list') currentPoints = focusPointsShoppingList;
+        else if (activeDiagram.id === 'share-recipe') currentPoints = focusPointsShare;
+        else if (activeDiagram.id === 'favorites-ratings') currentPoints = focusPointsFavorites;
+        else currentPoints = focusPointsShoppingCart;
+
+        const focusY = currentPoints[step] || 0;
+        const containerHeight = scrollContainer.clientHeight;
+        let targetTop = focusY + 64 - (containerHeight / 2); 
+        if (targetTop < 0) targetTop = 0;
+        scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
+    }
+  }, [step, activeDiagram]);
+
+  const nextStep = () => setStep(prev => Math.min(prev + 1, totalSteps));
+  const prevStep = () => setStep(prev => Math.max(prev - 1, 0));
+  const reset = () => setStep(0);
+  
+  const handleDiagramChange = (diagram) => {
+      setActiveDiagram(diagram);
+      setStep(0);
+      setIsMenuOpen(false);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') nextStep();
+      if (e.key === 'ArrowLeft') prevStep();
+      if (e.key === 'Escape') setIsMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [totalSteps]); 
+
+  // --- RENDERIZADORES ---
+
+  const renderWebEmbed = () => (
+    <div className="w-full h-full flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in duration-500">
+        <div className="w-full max-w-6xl h-full bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="bg-slate-800 p-3 flex items-center gap-3 border-b border-slate-700">
+                <div className="flex gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                </div>
+                <div className="flex-1 bg-slate-900 rounded-md px-4 py-1.5 text-xs text-slate-400 font-mono flex items-center justify-between">
+                    <span className="truncate">{FINAL_WEB_URL}</span>
+                    <ExternalLink size={12} className="opacity-50" />
+                </div>
+            </div>
+            <div className="flex-1 bg-white relative">
+                <iframe 
+                    src={FINAL_WEB_URL} 
+                    title="Web Preview"
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                />
+            </div>
+        </div>
+        <p className="mt-4 text-slate-500 text-sm">Fin de la secuencia</p>
+    </div>
+  );
+
+  const renderMainSequence = () => {
+     // ... (Código completo de Main Sequence)
+     const pos = { user: 80, admin: 220, ui: 420, control: 620, pendiente: 800, reportado: 950, aceptado: 1100, baneado: 1250 };
+     const svgHeight = 1600;
+     
+     return (
+     <div className="min-w-[1400px] p-8 flex justify-center items-start pt-16">
+         <svg ref={svgRef} width="1350" height={svgHeight} viewBox={`0 0 1350 ${svgHeight}`} className="drop-shadow-2xl font-sans">
+             <defs>
+                 <marker id="arrowhead-filled" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                     <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
+                 </marker>
+                 <marker id="arrowhead-open" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                     <polyline points="0 0, 10 3.5, 0 7" fill="none" stroke="#94a3b8" strokeWidth="1.5" />
+                 </marker>
+             </defs>
+ 
+             <g className={`transition-opacity duration-1000 ${step >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                 <Lifeline x={pos.user} height={svgHeight - 50} label="usuario" type="actor" color="text-slate-300" />
+                 <Lifeline x={pos.admin} height={svgHeight - 50} label="Administrador" type="actor" color="text-slate-300" />
+                 <Lifeline x={pos.ui} height={svgHeight - 50} label="panel de moderación" subLabel="IU" type="boundary" icon={Circle} color="text-blue-400" />
+                 <Lifeline x={pos.control} height={svgHeight - 50} label="panel de moderación" type="control" icon={RefreshCw} color="text-blue-400" />
+                 <Lifeline x={pos.pendiente} height={svgHeight - 50} label="Pendiente" type="entity" color="text-sky-300" />
+                 <Lifeline x={pos.reportado} height={svgHeight - 50} label="Reportado" type="entity" color="text-sky-300" />
+                 <Lifeline x={pos.aceptado} height={svgHeight - 50} label="Aceptado" type="entity" color="text-sky-300" />
+                 <Lifeline x={pos.baneado} height={svgHeight - 50} label="Baneado" type="entity" color="text-sky-300" />
+             </g>
+ 
+             {/* --- PASOS --- */}
+             <GroupFrame x={pos.user - 40} y={100} width={pos.control - pos.user + 80} height={160} type="loop" label="Credenciales incorrectas" show={step >= 1} />
+             
+             <ActivationBox x={pos.admin} y={130} height={120} show={step >= 2} />
+             <ActivationBox x={pos.ui} y={130} height={120} show={step >= 2} />
+             <Message fromX={pos.admin} toX={pos.ui} y={150} label="1: AccesoAdmin()" show={step >= 2} />
+             <ActivationBox x={pos.control} y={150} height={40} show={step >= 2} />
+             <Message fromX={pos.ui} toX={pos.control} y={160} label="1.1: AccesoAdmin()" show={step >= 2} />
+             <Message fromX={pos.control} toX={pos.ui} y={185} label="1.2: mostrarFormularioLogin()" isReturn={true} show={step >= 2} />
+             <Message fromX={pos.ui} toX={pos.admin} y={205} label="1.3: mostrarFormularioLogin()" isReturn={true} show={step >= 2} />
+ 
+             <ActivationBox x={pos.admin} y={290} height={90} show={step >= 3} />
+             <ActivationBox x={pos.ui} y={290} height={90} show={step >= 3} />
+             <Message fromX={pos.admin} toX={pos.ui} y={300} label="2: accesoPanelMod()" show={step >= 3} />
+             <ActivationBox x={pos.control} y={300} height={50} show={step >= 3} />
+             <Message fromX={pos.ui} toX={pos.control} y={310} label="2.1: accesoPanelMod()" show={step >= 3} />
+             <Message fromX={pos.control} toX={pos.ui} y={340} label="2.2: irAmbitoMod()" isReturn={true} show={step >= 3} />
+             <Message fromX={pos.ui} toX={pos.admin} y={360} label="2.3: irAmbitoMod()" isReturn={true} show={step >= 3} />
+ 
+             <GroupFrame x={pos.admin - 60} y={400} width={1150} height={420} type="alt" label="checkOn_Contenido Reportado == true" show={step >= 4} />
+             <GroupFrame x={pos.admin - 40} y={430} width={1110} height={370} type="loop" label="Por cada reporte..." show={step >= 5} />
+             
+             <ActivationBox x={pos.admin} y={460} height={100} show={step >= 6} />
+             <ActivationBox x={pos.ui} y={460} height={100} show={step >= 6} />
+             <Message fromX={pos.admin} toX={pos.ui} y={470} label="3: revisarReportes()" show={step >= 6} />
+             <ActivationBox x={pos.control} y={470} height={80} show={step >= 6} />
+             <Message fromX={pos.ui} toX={pos.control} y={480} label="3.1: revisarReportes()" show={step >= 6} />
+             <ActivationBox x={pos.reportado} y={480} height={30} show={step >= 6} />
+             <Message fromX={pos.control} toX={pos.reportado} y={490} label="4: revisarReportes()" show={step >= 6} />
+             <Message fromX={pos.reportado} toX={pos.control} y={510} label="4.1: mostrarReporte()" isReturn={true} show={step >= 6} />
+             <Message fromX={pos.control} toX={pos.ui} y={530} label="3.2: mostrarReporte()" isReturn={true} show={step >= 6} />
+             <Message fromX={pos.ui} toX={pos.admin} y={545} label="3.2: mostrarReporte()" isReturn={true} show={step >= 6} />
+ 
+             <ActivationBox x={pos.admin} y={630} height={150} show={step >= 7} />
+             <ActivationBox x={pos.ui} y={630} height={150} show={step >= 7} />
+             <Message fromX={pos.admin} toX={pos.ui} y={640} label="5: addDecision()" show={step >= 7} />
+             <ActivationBox x={pos.control} y={640} height={130} show={step >= 7} />
+             <Message fromX={pos.ui} toX={pos.control} y={650} label="5.1: addDecision()" show={step >= 7} />
+ 
+             <GroupFrame x={pos.control + 20} y={580} width={630} height={200} type="alt" label="ContenidoAceptado" show={step >= 8} />
+ 
+             <ActivationBox x={pos.aceptado} y={660} height={30} show={step >= 9} />
+             <Message fromX={pos.control} toX={pos.aceptado} y={670} label="5.1.1: addDecision()..." show={step >= 9} />
+             
+             <AltDivider x={pos.control + 20} y={710} width={630} label="ContenidoBaneado" show={step >= 10} />
+             <ActivationBox x={pos.baneado} y={730} height={30} show={step >= 10} />
+             <Message fromX={pos.control} toX={pos.baneado} y={740} label="5.1.2: addDecision()..." show={step >= 10} />
+ 
+             <GroupFrame x={pos.admin - 60} y={840} width={1150} height={520} type="alt" label="checkOn_ContenidoPendiente == true" show={step >= 11} />
+             <GroupFrame x={pos.admin - 40} y={870} width={1110} height={470} type="loop" label="Por cada reporte pendiente..." show={step >= 12} />
+ 
+             <ActivationBox x={pos.admin} y={900} height={100} show={step >= 13} />
+             <ActivationBox x={pos.ui} y={900} height={100} show={step >= 13} />
+             <Message fromX={pos.admin} toX={pos.ui} y={910} label="6: revisarPendientes()" show={step >= 13} />
+             <ActivationBox x={pos.control} y={910} height={80} show={step >= 13} />
+             <Message fromX={pos.ui} toX={pos.control} y={920} label="6.1: revisarPendientes()" show={step >= 13} />
+             <ActivationBox x={pos.pendiente} y={920} height={30} show={step >= 13} />
+             <Message fromX={pos.control} toX={pos.pendiente} y={930} label="7: revisarPendientes()" show={step >= 13} />
+             <Message fromX={pos.pendiente} toX={pos.control} y={950} label="7.1: mostrarPendientes()" isReturn={true} show={step >= 13} />
+             <Message fromX={pos.control} toX={pos.ui} y={970} label="6.2: mostrarPendientes()" isReturn={true} show={step >= 13} />
+             <Message fromX={pos.ui} toX={pos.admin} y={985} label="Return" isReturn={true} show={step >= 13} />
+ 
+             <ActivationBox x={pos.admin} y={1050} height={220} show={step >= 14} />
+             <ActivationBox x={pos.ui} y={1050} height={220} show={step >= 14} />
+             <Message fromX={pos.admin} toX={pos.ui} y={1060} label="8: addDecision()" show={step >= 14} />
+             <ActivationBox x={pos.control} y={1060} height={200} show={step >= 14} />
+             <Message fromX={pos.ui} toX={pos.control} y={1070} label="8.1: addDecision()" show={step >= 14} />
+ 
+             <GroupFrame x={pos.control + 20} y={1080} width={630} height={180} type="alt" label="ContenidoAceptado" show={step >= 15} />
+ 
+             <ActivationBox x={pos.aceptado} y={1100} height={30} show={step >= 16} />
+             <Message fromX={pos.control} toX={pos.aceptado} y={1110} label="8.1.1: addDecision()..." show={step >= 16} />
+             <ActivationBox x={pos.reportado} y={1120} height={30} show={step >= 16} />
+             <Message fromX={pos.control} toX={pos.reportado} y={1135} label="8.1.2: addReporte()" show={step >= 16} />
+ 
+             <AltDivider x={pos.control + 20} y={1160} width={630} label="ContenidoBaneado" show={step >= 17} />
+             <ActivationBox x={pos.baneado} y={1180} height={30} show={step >= 17} />
+             <Message fromX={pos.control} toX={pos.baneado} y={1190} label="8.1.3: addDecision()..." show={step >= 17} />
+             <ActivationBox x={pos.reportado} y={1200} height={30} show={step >= 17} />
+             <Message fromX={pos.control} toX={pos.reportado} y={1215} label="8.1.4: addReporte()" show={step >= 17} />
+ 
+             <ActivationBox x={pos.admin} y={1400} height={80} show={step >= 18} />
+             <ActivationBox x={pos.ui} y={1400} height={80} show={step >= 18} />
+             <Message fromX={pos.admin} toX={pos.ui} y={1410} label="9: salirMod()" show={step >= 18} />
+             <ActivationBox x={pos.control} y={1410} height={60} show={step >= 18} />
+             <Message fromX={pos.ui} toX={pos.control} y={1420} label="9.1: salirMod()" show={step >= 18} />
+             <Message fromX={pos.control} toX={pos.ui} y={1440} label="9.2: irAmbitoPrincipal()" isReturn={true} show={step >= 18} />
+             <Message fromX={pos.ui} toX={pos.admin} y={1460} label="9.3: irAmbitoPrincipal()" isReturn={true} show={step >= 18} />
+         </svg>
+     </div>
+   )};
+ 
+   const renderGlobalUserManagement = () => {
+     // ... (Código completo de Global User)
+     const pos = { user: 80, admin: 230, panelIU: 380, panelCtrl: 550, userIU: 750, operaciones: 950, usuarios: 1100 };
+     const svgHeight = 2900;
+ 
+     return (
+       <div className="min-w-[1200px] p-8 flex justify-center items-start pt-16">
+         <svg width="1200" height={svgHeight} viewBox={`0 0 1200 ${svgHeight}`} className="drop-shadow-2xl font-sans">
+              <defs>
+                 <marker id="arrowhead-filled" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                     <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
+                 </marker>
+                 <marker id="arrowhead-open" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                     <polyline points="0 0, 10 3.5, 0 7" fill="none" stroke="#94a3b8" strokeWidth="1.5" />
+                 </marker>
+             </defs>
+ 
+             <g className={`transition-opacity duration-1000 ${step >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                 <Lifeline x={pos.user} height={svgHeight - 50} label="usuario" type="actor" color="text-slate-300" />
+                 <Lifeline x={pos.admin} height={svgHeight - 50} label="Administrador" type="actor" color="text-slate-300" />
+                 <Lifeline x={pos.panelIU} height={svgHeight - 50} label="panel de admin." subLabel="IU" type="boundary" icon={Circle} color="text-blue-400" />
+                 <Lifeline x={pos.panelCtrl} height={svgHeight - 50} label="panel de admin." type="control" icon={RefreshCw} color="text-blue-400" />
+                 <Lifeline x={pos.userIU} height={svgHeight - 50} label="usuario" subLabel="IU" type="boundary" icon={Layout} color="text-sky-300" />
+                 <Lifeline x={pos.operaciones} height={svgHeight - 50} label="M : Operaciones" type="object" color="text-sky-300" />
+                 <Lifeline x={pos.usuarios} height={svgHeight - 50} label=": usuarios" type="object" color="text-sky-300" />
+             </g>
+ 
+             <GroupFrame x={pos.user - 40} y={100} width={pos.usuarios - pos.user + 60} height={200} type="alt" label="[ClickOn_registrar == true]" show={step >= 1} />
+             <ActivationBox x={pos.panelCtrl} y={130} height={160} show={step >= 2} />
+             <Message fromX={pos.user} toX={pos.panelCtrl} y={140} label="1: formularioRegistro()" show={step >= 2} />
+             <Message fromX={pos.panelCtrl} toX={pos.user} y={160} label="1.1: getFormulario()" isReturn={true} show={step >= 2} />
+             <GroupFrame x={pos.user - 20} y={180} width={pos.usuarios - pos.user + 20} height={100} type="alt" label="[newUser == true]" show={step >= 3} />
+             <Message fromX={pos.user} toX={pos.panelCtrl} y={230} label="3: saveUser()" show={step >= 4} />
+             <ActivationBox x={pos.usuarios} y={230} height={30} show={step >= 4} />
+             <Message fromX={pos.panelCtrl} toX={pos.usuarios} y={240} label="2: insertUser()" show={step >= 4} />
+             <GroupFrame x={pos.user - 40} y={320} width={pos.usuarios - pos.user + 60} height={600} type="alt" label="[ClickOn_login == true]" show={step >= 6} />
+             <GroupFrame x={pos.user - 20} y={350} width={pos.panelCtrl - pos.user + 60} height={160} type="loop" label="[Por cada intento incorrecto]" show={step >= 7} />
+             <ActivationBox x={pos.panelIU} y={380} height={120} show={step >= 8} />
+             <Message fromX={pos.user} toX={pos.panelIU} y={400} label="4: Acceso()" show={step >= 8} />
+             <ActivationBox x={pos.panelCtrl} y={400} height={350} show={step >= 8} />
+             <Message fromX={pos.panelIU} toX={pos.panelCtrl} y={420} label="4.1: Acceso()" show={step >= 8} />
+             <Message fromX={pos.panelCtrl} toX={pos.panelIU} y={450} label="4.2: mostrarFormLogin()" isReturn={true} show={step >= 9} />
+             <Message fromX={pos.panelIU} toX={pos.user} y={470} label="4.3: mostrarFormLogin()" isReturn={true} show={step >= 9} />
+             <Message fromX={pos.user} toX={pos.panelCtrl} y={540} label="6: checkUser()" show={step >= 10} />
+             <ActivationBox x={pos.usuarios} y={540} height={40} show={step >= 11} />
+             <Message fromX={pos.panelCtrl} toX={pos.usuarios} y={550} label="5: checkUser()" show={step >= 11} />
+             <Message fromX={pos.usuarios} toX={pos.panelCtrl} y={570} label="5.1: boolUser()" isReturn={true} show={step >= 11} />
+             <GroupFrame x={pos.user - 20} y={600} width={pos.userIU - pos.user + 40} height={150} type="alt" label="checkUser result" show={step >= 12} />
+             <AltDivider x={pos.user - 20} y={670} width={pos.userIU - pos.user + 40} label="[checkUser == false]" show={step >= 12} />
+             <ActivationBox x={pos.userIU} y={620} height={30} show={step >= 13} />
+             <Message fromX={pos.panelCtrl} toX={pos.userIU} y={630} label="7: getIU()" show={step >= 13} />
+             <Message fromX={pos.panelCtrl} toX={pos.user} y={700} label="8: getInicio()" isReturn={true} show={step >= 13} />
+             <ActivationBox x={pos.panelIU} y={950} height={100} show={step >= 14} />
+             <ActivationBox x={pos.panelCtrl} y={960} height={80} show={step >= 14} />
+             <Message fromX={pos.admin} toX={pos.panelIU} y={960} label="9: AccesoPanelAdmin()" show={step >= 14} />
+             <Message fromX={pos.panelIU} toX={pos.panelCtrl} y={980} label="9.1: AccesoPanelAdmin()" show={step >= 14} />
+             <Message fromX={pos.panelCtrl} toX={pos.panelIU} y={1000} label="9.2: irPanelAdmin()" isReturn={true} show={step >= 14} />
+             <Message fromX={pos.panelIU} toX={pos.admin} y={1020} label="9.3: irPanelAdmin()" isReturn={true} show={step >= 14} />
+             <ActivationBox x={pos.panelIU} y={1080} height={120} show={step >= 15} />
+             <ActivationBox x={pos.panelCtrl} y={1090} height={100} show={step >= 15} />
+             <Message fromX={pos.admin} toX={pos.panelIU} y={1100} label="10: selectModulo()" show={step >= 15} />
+             <Message fromX={pos.panelIU} toX={pos.panelCtrl} y={1120} label="10.1: selectModulo()" show={step >= 15} />
+             <Message fromX={pos.panelCtrl} toX={pos.panelIU} y={1150} label="10.2: irModuloTipo()" isReturn={true} show={step >= 15} />
+             <Message fromX={pos.panelIU} toX={pos.admin} y={1170} label="10.3: irModuloTipo()" isReturn={true} show={step >= 15} />
+             <GroupFrame x={pos.admin - 40} y={1200} width={pos.usuarios - pos.admin + 80} height={1400} type="alt" label="[ClickOn_Mantenimiento == true]" show={step >= 16} />
+             <GroupFrame x={pos.admin - 20} y={1240} width={pos.usuarios - pos.admin + 40} height={250} type="loop" label="[Hasta que operacionesPendientes == 0]" show={step >= 17} />
+             <ActivationBox x={pos.panelIU} y={1280} height={150} show={step >= 18} />
+             <ActivationBox x={pos.panelCtrl} y={1290} height={130} show={step >= 18} />
+             <ActivationBox x={pos.operaciones} y={1310} height={80} show={step >= 18} />
+             <Message fromX={pos.admin} toX={pos.panelIU} y={1300} label="20: operationUsers()" show={step >= 18} />
+             <Message fromX={pos.panelIU} toX={pos.panelCtrl} y={1320} label="20.1: operationUsers()" show={step >= 18} />
+             <Message fromX={pos.panelCtrl} toX={pos.operaciones} y={1340} label="20.1.1: operationUsers()" show={step >= 18} />
+             <Message fromX={pos.operaciones} toX={pos.panelCtrl} y={1370} label="20.1.2: getOperationUser()" isReturn={true} show={step >= 18} />
+             <Message fromX={pos.panelCtrl} toX={pos.panelIU} y={1390} label="20.2: getOperationUser()" isReturn={true} show={step >= 18} />
+             <Message fromX={pos.panelIU} toX={pos.admin} y={1410} label="20.3: getOperationUser()" isReturn={true} show={step >= 18} />
+             <GroupFrame x={pos.admin - 20} y={1520} width={pos.usuarios - pos.admin + 40} height={200} type="loop" label="[Hasta que errorOperation == false]" show={step >= 19} />
+             <ActivationBox x={pos.panelIU} y={1550} height={100} show={step >= 20} />
+             <ActivationBox x={pos.panelCtrl} y={1560} height={80} show={step >= 20} />
+             <ActivationBox x={pos.operaciones} y={1570} height={30} show={step >= 20} />
+             <Message fromX={pos.admin} toX={pos.panelIU} y={1570} label="21: operacionCompleta()" show={step >= 20} />
+             <Message fromX={pos.panelIU} toX={pos.panelCtrl} y={1590} label="22: operacionCompleta()" show={step >= 20} />
+             <Message fromX={pos.panelCtrl} toX={pos.operaciones} y={1610} label="22.1: borrarOperacion()" show={step >= 20} />
+             <ActivationBox x={pos.panelIU} y={1750} height={80} show={step >= 21} />
+             <ActivationBox x={pos.panelCtrl} y={1760} height={60} show={step >= 21} />
+             <ActivationBox x={pos.usuarios} y={1770} height={30} show={step >= 21} />
+             <Message fromX={pos.admin} toX={pos.panelIU} y={1760} label="23: guardarCambios()" show={step >= 21} />
+             <Message fromX={pos.panelIU} toX={pos.panelCtrl} y={1780} label="23.1: guardarCambios()" show={step >= 21} />
+             <Message fromX={pos.panelCtrl} toX={pos.usuarios} y={1800} label="23.1.1: guardarCambios()" show={step >= 21} />
+             <AltDivider x={pos.admin - 40} y={1970} width={pos.usuarios - pos.admin + 80} label="[ClickOn_Auditoria == true]" show={step >= 22} />
+             <GroupFrame x={pos.admin - 20} y={2000} width={pos.usuarios - pos.admin + 40} height={250} type="loop" label="[Hasta que operacionesPendientes == 0]" show={step >= 23} />
+             <ActivationBox x={pos.panelIU} y={2040} height={150} show={step >= 24} />
+             <ActivationBox x={pos.panelCtrl} y={2050} height={130} show={step >= 24} />
+             <ActivationBox x={pos.operaciones} y={2070} height={80} show={step >= 24} />
+             <Message fromX={pos.admin} toX={pos.panelIU} y={2060} label="24: operationUsers()" show={step >= 24} />
+             <Message fromX={pos.panelIU} toX={pos.panelCtrl} y={2080} label="24.1: operationUsers()" show={step >= 24} />
+             <Message fromX={pos.panelCtrl} toX={pos.operaciones} y={2100} label="24.1.1: operationUsers()" show={step >= 24} />
+             <Message fromX={pos.operaciones} toX={pos.panelCtrl} y={2130} label="24.1.2: getOperationUser()" isReturn={true} show={step >= 24} />
+             <Message fromX={pos.panelCtrl} toX={pos.panelIU} y={2150} label="24.1.2: getOperationUser()" isReturn={true} show={step >= 24} />
+             <GroupFrame x={pos.admin - 20} y={2280} width={pos.usuarios - pos.admin + 40} height={200} type="loop" label="[Hasta que errorOperation == false]" show={step >= 25} />
+             <ActivationBox x={pos.panelIU} y={2310} height={100} show={step >= 26} />
+             <ActivationBox x={pos.panelCtrl} y={2320} height={80} show={step >= 26} />
+             <ActivationBox x={pos.operaciones} y={2330} height={30} show={step >= 26} />
+             <Message fromX={pos.admin} toX={pos.panelIU} y={2330} label="26: operacionCompleta()" show={step >= 26} />
+             <Message fromX={pos.panelIU} toX={pos.panelCtrl} y={2350} label="25: operacionCompleta()" show={step >= 26} />
+             <Message fromX={pos.panelCtrl} toX={pos.operaciones} y={2370} label="25.1: borrarOperacion()" show={step >= 26} />
+             <ActivationBox x={pos.panelIU} y={2510} height={80} show={step >= 27} />
+             <ActivationBox x={pos.panelCtrl} y={2520} height={60} show={step >= 27} />
+             <ActivationBox x={pos.usuarios} y={2530} height={30} show={step >= 27} />
+             <Message fromX={pos.admin} toX={pos.panelIU} y={2520} label="27: guardarCambios()" show={step >= 27} />
+             <Message fromX={pos.panelIU} toX={pos.panelCtrl} y={2540} label="27.1: guardarCambios()" show={step >= 27} />
+             <Message fromX={pos.panelCtrl} toX={pos.usuarios} y={2560} label="27.1.1: guardarCambios()" show={step >= 27} />
+             
+             {/* SALIDA MEJORADA (PASOS 28-30) */}
+             <ActivationBox x={pos.admin} y={2660} height={100} show={step >= 28} />
+             <ActivationBox x={pos.panelIU} y={2660} height={100} show={step >= 28} />
+             <ActivationBox x={pos.panelCtrl} y={2670} height={80} show={step >= 28} />
+             
+             <Message fromX={pos.admin} toX={pos.panelIU} y={2670} label="28: salirGestionGlobal()" show={step >= 28} />
+             <Message fromX={pos.panelIU} toX={pos.panelCtrl} y={2690} label="28.1: salirGestionGlobal()" show={step >= 29} />
+             <Message fromX={pos.panelCtrl} toX={pos.panelIU} y={2710} label="28.2: irAmbitoPrincipal()" isReturn={true} show={step >= 30} />
+             <Message fromX={pos.panelIU} toX={pos.admin} y={2730} label="28.3: irAmbitoPrincipal()" isReturn={true} show={step >= 30} />
+         </svg>
+       </div>
+     );
+   };
+ 
+   const renderRecipeManagement = () => {
+    // ... [Mismo código que antes para Recipe Management] ...
+    const pos = { 
+        user: 60, 
+        ui: 210, 
+        control: 360, 
+        recetas: 510, 
+        ingredientes: 660, 
+        operaciones: 810, 
+        pendiente: 960 
+    };
+    const svgHeight = 2800; 
+
+    return (
+      <div className="min-w-[1200px] p-8 flex justify-center items-start pt-16">
+        <svg width="1200" height={svgHeight} viewBox={`0 0 1200 ${svgHeight}`} className="drop-shadow-2xl font-sans">
+             <defs>
+                <marker id="arrowhead-filled" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
+                </marker>
+                <marker id="arrowhead-open" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polyline points="0 0, 10 3.5, 0 7" fill="none" stroke="#94a3b8" strokeWidth="1.5" />
+                </marker>
+            </defs>
+
+            {/* LIFELINES */}
+            <g className={`transition-opacity duration-1000 ${step >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                <Lifeline x={pos.user} height={svgHeight - 50} label="usuario" type="actor" color="text-slate-300" />
+                <Lifeline x={pos.ui} height={svgHeight - 50} label="Administracion de recetas" subLabel="UI" type="boundary" icon={Layout} color="text-blue-400" />
+                <Lifeline x={pos.control} height={svgHeight - 50} label="Administracion de recetas" type="control" icon={RefreshCw} color="text-blue-400" />
+                <Lifeline x={pos.recetas} height={svgHeight - 50} label="clase Recetas" type="entity" icon={BookOpen} color="text-sky-300" />
+                <Lifeline x={pos.ingredientes} height={svgHeight - 50} label="Ingredientes" type="entity" icon={Utensils} color="text-sky-300" />
+                <Lifeline x={pos.operaciones} height={svgHeight - 50} label="operaciones" type="entity" icon={List} color="text-purple-300" />
+                <Lifeline x={pos.pendiente} height={svgHeight - 50} label="pendiente" type="entity" icon={ClipboardList} color="text-purple-300" />
+            </g>
+
+            {/* --- BLOQUES PREVIOS (1-6) --- */}
+            <GroupFrame x={pos.user - 30} y={100} width={pos.control - pos.user + 50} height={150} type="alt" label="[Login == True]" show={step >= 1} />
+            <ActivationBox x={pos.ui} y={130} height={100} show={step >= 2} />
+            <ActivationBox x={pos.control} y={140} height={80} show={step >= 2} />
+            <Message fromX={pos.user} toX={pos.ui} y={140} label="1: AccederCreacion()" show={step >= 2} />
+            <Message fromX={pos.ui} toX={pos.control} y={150} label="1.1: AccederCreacion()" show={step >= 2} />
+            <Message fromX={pos.control} toX={pos.ui} y={180} label="1.2: mostrarAmbitoCreacion()" isReturn={true} show={step >= 3} />
+            <Message fromX={pos.ui} toX={pos.user} y={200} label="1.3: mostrarAmbitoCreacion()" isReturn={true} show={step >= 4} />
+
+            {/* Aumentado el alto del frame principal */}
+            <GroupFrame x={pos.user - 40} y={270} width={1100} height={1800} type="alt" label="[clickOnCrearReceta == true]" show={step >= 3} />
+
+            <GroupFrame x={pos.user - 20} y={300} width={pos.recetas - pos.user + 50} height={200} type="loop" label="[camposVacios == true]" show={step >= 4} />
+            <ActivationBox x={pos.ui} y={320} height={160} show={step >= 5} />
+            <ActivationBox x={pos.control} y={330} height={140} show={step >= 5} />
+            <Message fromX={pos.user} toX={pos.ui} y={340} label="2: crearReceta()" show={step >= 5} />
+            <Message fromX={pos.ui} toX={pos.control} y={350} label="2.1: crearReceta()" show={step >= 5} />
+            <ActivationBox x={pos.recetas} y={360} height={30} show={step >= 6} />
+            <Message fromX={pos.control} toX={pos.recetas} y={370} label="2.1.1: newReceta()" show={step >= 6} />
+            <Message fromX={pos.control} toX={pos.ui} y={390} label="2.1.2: mostrarFormulario()" isReturn={true} show={step >= 7} />
+            <Message fromX={pos.ui} toX={pos.user} y={410} label="2.1.3: mostrarFormulario()" isReturn={true} show={step >= 7} />
+            
+            <Message fromX={pos.user} toX={pos.ui} y={430} label="3: guardarInformacion()" show={step >= 8} />
+            <Message fromX={pos.ui} toX={pos.control} y={440} label="2.1.4: guardarInformacion()" show={step >= 8} />
+            <ActivationBox x={pos.recetas} y={450} height={30} show={step >= 9} />
+            <Message fromX={pos.control} toX={pos.recetas} y={460} label="2.1.4.1: guardarInformacion()" show={step >= 9} />
+            <Message fromX={pos.control} toX={pos.ui} y={480} label="2.1.4.1.1: getNewListRecetas()" isReturn={true} show={step >= 9} />
+
+            <GroupFrame x={pos.user - 20} y={520} width={pos.operaciones - pos.user + 50} height={450} type="loop" label="loop(1, 100) [Por cada ingrediente a añadir]" show={step >= 10} />
+            <ActivationBox x={pos.ui} y={550} height={100} show={step >= 11} />
+            <ActivationBox x={pos.control} y={560} height={80} show={step >= 11} />
+            <Message fromX={pos.user} toX={pos.ui} y={570} label="4: addIngredientes()" show={step >= 11} />
+            <Message fromX={pos.ui} toX={pos.control} y={580} label="4.1: addIngredientes()" show={step >= 11} />
+            <ActivationBox x={pos.ingredientes} y={590} height={30} show={step >= 12} />
+            <Message fromX={pos.control} toX={pos.ingredientes} y={600} label="4.1.1: addIngredientes()" show={step >= 12} />
+            <Message fromX={pos.ingredientes} toX={pos.control} y={620} label="4.1.2: getInventario()" isReturn={true} show={step >= 13} />
+            <Message fromX={pos.control} toX={pos.ui} y={640} label="4.2: getInventario()" isReturn={true} show={step >= 14} />
+            <Message fromX={pos.ui} toX={pos.user} y={660} label="4.2: getInventario()" isReturn={true} show={step >= 14} />
+
+            <GroupFrame x={pos.user - 10} y={680} width={pos.operaciones - pos.user + 40} height={270} type="alt" label="[IngredienteEncontrado == true]" show={step >= 15} />
+            <ActivationBox x={pos.ui} y={700} height={60} show={step >= 16} />
+            <ActivationBox x={pos.control} y={710} height={50} show={step >= 16} />
+            <Message fromX={pos.user} toX={pos.ui} y={720} label="5: addIngrediente()" show={step >= 16} />
+            <Message fromX={pos.ui} toX={pos.control} y={730} label="5.1: addIngrediente()" show={step >= 16} />
+            <ActivationBox x={pos.recetas} y={740} height={30} show={step >= 17} />
+            <Message fromX={pos.control} toX={pos.recetas} y={750} label="5.1.1: addIngrediente()" show={step >= 17} />
+
+            <AltDivider x={pos.user - 10} y={780} width={pos.operaciones - pos.user + 40} label="[IngredienteEncontrado == false]" show={step >= 18} />
+            <GroupFrame x={pos.user} y={800} width={pos.operaciones - pos.user + 20} height={40} type="ref" label="Gestión global de el sistema Sequence Diagram" show={step >= 19} />
+            <ActivationBox x={pos.ui} y={850} height={60} show={step >= 20} />
+            <ActivationBox x={pos.control} y={860} height={50} show={step >= 20} />
+            <Message fromX={pos.user} toX={pos.ui} y={860} label="6: addIngrediente()" show={step >= 20} />
+            <Message fromX={pos.ui} toX={pos.control} y={870} label="6.1: addIngrediente()" show={step >= 20} />
+            <ActivationBox x={pos.recetas} y={880} height={30} show={step >= 21} />
+            <Message fromX={pos.control} toX={pos.recetas} y={890} label="5.1.2: addIngrediente()" show={step >= 22} />
+
+            {/* --- NUEVA CONTINUACIÓN (PASOS 7-14.3) --- */}
+            
+            {/* Alt: Campos Vacios (Preparacion) */}
+            <GroupFrame x={pos.user - 20} y={1000} width={pos.recetas - pos.user + 50} height={250} type="alt" label="[CamposVacios == true]" show={step >= 23} />
+            
+            <GroupFrame x={pos.user - 10} y={1030} width={pos.recetas - pos.user + 30} height={180} type="loop" label="[Hasta que camposVacios == false]" show={step >= 24} />
+            <ActivationBox x={pos.ui} y={1050} height={100} show={step >= 25} />
+            <ActivationBox x={pos.control} y={1060} height={80} show={step >= 25} />
+            <Message fromX={pos.user} toX={pos.ui} y={1070} label="7: addPreparacion()" show={step >= 25} />
+            <Message fromX={pos.ui} toX={pos.control} y={1080} label="7.1: addPreparacion()" show={step >= 25} />
+            <Message fromX={pos.control} toX={pos.ui} y={1110} label="7.2: mostrarFormulario()" show={step >= 26} />
+            <Message fromX={pos.ui} toX={pos.user} y={1130} label="8: mostrarFormulario()" isReturn={true} show={step >= 26} />
+
+            {/* Alt: Campos Vacios == false */}
+            <AltDivider x={pos.user - 20} y={1270} width={pos.recetas - pos.user + 50} label="[CamposVacios == false]" show={step >= 27} />
+            
+            <ActivationBox x={pos.ui} y={1300} height={80} show={step >= 28} />
+            <ActivationBox x={pos.control} y={1310} height={60} show={step >= 28} />
+            <ActivationBox x={pos.recetas} y={1320} height={30} show={step >= 28} />
+            
+            <Message fromX={pos.user} toX={pos.ui} y={1310} label="10: guardarPreparacion()" show={step >= 28} />
+            <Message fromX={pos.ui} toX={pos.control} y={1320} label="9: guardarPreparacion()" show={step >= 28} />
+            <Message fromX={pos.control} toX={pos.recetas} y={1330} label="7.3: guardarPreparacion()" show={step >= 28} />
+
+            {/* Alt: Foto Correcta (Falso) */}
+            {/* REDUCIDO ALTO para que 13 y 14 queden fuera */}
+            <GroupFrame x={pos.user - 20} y={1400} width={1050} height={320} type="alt" label="[FotoCorrecta == false]" show={step >= 29} />
+            
+            <GroupFrame x={pos.user - 10} y={1430} width={1030} height={150} type="loop" label="[Hasta que FotoCorrecta == true]" show={step >= 30} />
+            <ActivationBox x={pos.ui} y={1460} height={80} show={step >= 31} />
+            <ActivationBox x={pos.control} y={1470} height={60} show={step >= 31} />
+            <Message fromX={pos.user} toX={pos.ui} y={1480} label="11: SubirFotos()" show={step >= 31} />
+            <Message fromX={pos.ui} toX={pos.control} y={1490} label="11.1: SubirFotos()" show={step >= 31} />
+            
+            <GroupFrame x={pos.user} y={1530} width={1000} height={40} type="ref" label="Moderación de contenido Sequence Diagram" show={step >= 32} />
+
+            {/* Alt: Foto Correcta == true */}
+            <AltDivider x={pos.user - 20} y={1600} width={1050} label="[FotoCorrecta == true]" show={step >= 33} />
+            
+            <ActivationBox x={pos.ui} y={1630} height={80} show={step >= 34} />
+            <ActivationBox x={pos.control} y={1640} height={60} show={step >= 34} />
+            <ActivationBox x={pos.recetas} y={1650} height={30} show={step >= 34} />
+            
+            <Message fromX={pos.user} toX={pos.ui} y={1640} label="12: guardarFoto()" show={step >= 34} />
+            <Message fromX={pos.ui} toX={pos.control} y={1650} label="11.2: guardarFoto()" show={step >= 34} />
+            <Message fromX={pos.control} toX={pos.recetas} y={1660} label="11.2.1: guardarFoto()" show={step >= 34} />
+
+            {/* Guardar Receta Final - AHORA FUERA DEL ALT */}
+            <ActivationBox x={pos.ui} y={1750} height={80} show={step >= 35} />
+            <ActivationBox x={pos.control} y={1760} height={60} show={step >= 35} />
+            <ActivationBox x={pos.recetas} y={1770} height={30} show={step >= 35} />
+            
+            <Message fromX={pos.user} toX={pos.ui} y={1760} label="13: guardarReceta()" show={step >= 35} />
+            <Message fromX={pos.ui} toX={pos.control} y={1770} label="13.1: guardarReceta()" show={step >= 35} />
+            <Message fromX={pos.control} toX={pos.recetas} y={1790} label="13.1.1: guardarReceta()" show={step >= 35} />
+
+            {/* Salir */}
+            <ActivationBox x={pos.ui} y={1880} height={80} show={step >= 36} />
+            <ActivationBox x={pos.control} y={1890} height={60} show={step >= 36} />
+            
+            <Message fromX={pos.user} toX={pos.ui} y={1890} label="14: salirCreacionRecetas()" show={step >= 36} />
+            <Message fromX={pos.ui} toX={pos.control} y={1900} label="14.1: salirCreacionRecetas()" show={step >= 36} />
+            <Message fromX={pos.control} toX={pos.ui} y={1920} label="14.2: irAmbitoPrincipal()" isReturn={true} show={step >= 37} />
+            <Message fromX={pos.ui} toX={pos.user} y={1940} label="14.3: irAmbitoPrincipal()" isReturn={true} show={step >= 37} />
+
+        </svg>
+      </div>
+    );
+  };
+
+  const renderSearchAndDiscover = () => {
+    // ... [Mismo código que antes para Search and Discover] ...
+    const pos = { 
+        user: 60, 
+        ui: 230, 
+        control: 430, 
+        inventario: 630, 
+        ia: 830, 
+        recetas: 1030 
+    };
+    const svgHeight = 1600;
+
+    return (
+      <div className="min-w-[1100px] p-8 flex justify-center items-start pt-16">
+        <svg width="1100" height={svgHeight} viewBox={`0 0 1100 ${svgHeight}`} className="drop-shadow-2xl font-sans">
+             <defs>
+                <marker id="arrowhead-filled" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
+                </marker>
+                <marker id="arrowhead-open" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polyline points="0 0, 10 3.5, 0 7" fill="none" stroke="#94a3b8" strokeWidth="1.5" />
+                </marker>
+            </defs>
+
+            {/* LIFELINES */}
+            <g className={`transition-opacity duration-1000 ${step >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                <Lifeline x={pos.user} height={svgHeight - 50} label="Usuario" type="actor" color="text-slate-300" />
+                <Lifeline x={pos.ui} height={svgHeight - 50} label="Buscar y descubrir recetas" subLabel="UI" type="boundary" icon={Layout} color="text-blue-400" />
+                <Lifeline x={pos.control} height={svgHeight - 50} label="Buscar y descubrir recetas" type="control" icon={RefreshCw} color="text-blue-400" />
+                <Lifeline x={pos.inventario} height={svgHeight - 50} label=": Inventario" type="entity" icon={Box} color="text-sky-300" />
+                <Lifeline x={pos.ia} height={svgHeight - 50} label=": IA" type="entity" icon={Cpu} color="text-sky-300" />
+                <Lifeline x={pos.recetas} height={svgHeight - 50} label=": Recetas" type="entity" icon={BookOpen} color="text-sky-300" />
+            </g>
+
+            {/* --- INICIO ACCESO --- */}
+            <ActivationBox x={pos.ui} y={130} height={100} show={step >= 1} />
+            <ActivationBox x={pos.control} y={140} height={80} show={step >= 1} />
+            <Message fromX={pos.user} toX={pos.ui} y={140} label="1: AccesoBuscar()" show={step >= 1} />
+            <Message fromX={pos.ui} toX={pos.control} y={150} label="1.1: AccesoBuscar()" show={step >= 1} />
+            <Message fromX={pos.control} toX={pos.ui} y={180} label="1.2: getAmbitoBuscar()" isReturn={true} show={step >= 2} />
+            <Message fromX={pos.ui} toX={pos.user} y={200} label="1.3: getAmbitoBuscar()" isReturn={true} show={step >= 2} />
+
+            {/* --- PROMPT --- */}
+            <ActivationBox x={pos.ui} y={260} height={60} show={step >= 3} />
+            <ActivationBox x={pos.control} y={270} height={700} show={step >= 3} />
+            <Message fromX={pos.user} toX={pos.ui} y={270} label="2: writePrompt()" show={step >= 3} />
+            <Message fromX={pos.ui} toX={pos.control} y={280} label="2.1: writePrompt()" show={step >= 3} />
+
+            {/* --- ALT BLOCK --- */}
+            <GroupFrame x={pos.user - 40} y={320} width={pos.ia - pos.user + 50} height={800} type="alt" label="[BusquedaTradicional == true]" show={step >= 3} />
+
+            {/* TRADICIONAL */}
+            <ActivationBox x={pos.inventario} y={350} height={60} show={step >= 4} />
+            <Message fromX={pos.control} toX={pos.inventario} y={360} label="2.1.1: enviarConsulta()" show={step >= 4} />
+            <Message fromX={pos.inventario} toX={pos.control} y={390} label="2.1.2: getRespuesta()" isReturn={true} show={step >= 4} />
+            
+            <Message fromX={pos.control} toX={pos.ui} y={420} label="2.2: getConsulta()" isReturn={true} show={step >= 5} />
+            <Message fromX={pos.ui} toX={pos.user} y={440} label="2.3: getConsulta()" isReturn={true} show={step >= 5} />
+
+            {/* IA */}
+            <AltDivider x={pos.user - 40} y={470} width={pos.ia - pos.user + 50} label="[BusquedaIA == true]" show={step >= 6} />
+            
+            <ActivationBox x={pos.ia} y={500} height={60} show={step >= 7} />
+            <Message fromX={pos.control} toX={pos.ia} y={510} label="2.3: enviarConsulta()" show={step >= 7} />
+            <Message fromX={pos.ia} toX={pos.control} y={540} label="2.4: getRespuesta()" isReturn={true} show={step >= 7} />
+            
+            <Message fromX={pos.control} toX={pos.ui} y={570} label="2.5: getConsulta()" isReturn={true} show={step >= 8} />
+            <Message fromX={pos.ui} toX={pos.user} y={590} label="2.5.1: getConsulta()" isReturn={true} show={step >= 8} />
+
+            {/* MIXTA */}
+            <AltDivider x={pos.user - 40} y={620} width={pos.ia - pos.user + 50} label="[BusquedaMixta == true]" show={step >= 9} />
+            
+            <ActivationBox x={pos.inventario} y={650} height={30} show={step >= 10} />
+            <ActivationBox x={pos.ia} y={660} height={60} show={step >= 10} />
+            
+            <Message fromX={pos.control} toX={pos.inventario} y={660} label="2.6: enviarConsulta()" show={step >= 10} />
+            <Message fromX={pos.control} toX={pos.ia} y={680} label="2.6.1: enviarConsulta()" show={step >= 10} />
+            <Message fromX={pos.ia} toX={pos.control} y={710} label="2.6.1.1: getRespuesta()" isReturn={true} show={step >= 11} />
+            
+            <Message fromX={pos.control} toX={pos.ui} y={740} label="2.7: getConsulta()" isReturn={true} show={step >= 12} />
+            <Message fromX={pos.ui} toX={pos.user} y={760} label="2.7.1: getConsulta()" isReturn={true} show={step >= 12} />
+
+            {/* --- BLOQUE: GUARDAR RECETA (Pasos 15-18) --- */}
+            <GroupFrame x={pos.user - 40} y={1150} width={pos.recetas - pos.user + 50} height={180} type="alt" label="[ClickOn_GuardarReceta == true]" show={step >= 15} />
+            
+            <ActivationBox x={pos.ui} y={1180} height={80} show={step >= 16} />
+            <ActivationBox x={pos.control} y={1190} height={60} show={step >= 16} />
+            <ActivationBox x={pos.recetas} y={1200} height={30} show={step >= 16} />
+            
+            <Message fromX={pos.user} toX={pos.ui} y={1190} label="3: guardarReceta()" show={step >= 16} />
+            <Message fromX={pos.ui} toX={pos.control} y={1200} label="3.1: guardarReceta()" show={step >= 17} />
+            <Message fromX={pos.control} toX={pos.recetas} y={1210} label="3.1.1: guardarReceta()" show={step >= 18} />
+
+            {/* --- BLOQUE: SALIR (Pasos 19-22) --- */}
+            <GroupFrame x={pos.user - 40} y={1350} width={pos.control - pos.user + 50} height={180} type="alt" label="[ClickOn_Salir == true]" show={step >= 19} />
+            
+            <ActivationBox x={pos.ui} y={1380} height={100} show={step >= 20} />
+            <ActivationBox x={pos.control} y={1390} height={60} show={step >= 20} />
+            
+            <Message fromX={pos.user} toX={pos.ui} y={1400} label="4: salirBuscar()" show={step >= 20} />
+            <Message fromX={pos.ui} toX={pos.control} y={1410} label="4.1: salirBuscar()" show={step >= 21} />
+            <Message fromX={pos.control} toX={pos.ui} y={1430} label="5: irAmbitoPrincipal()" isReturn={true} show={step >= 22} />
+            <Message fromX={pos.ui} toX={pos.user} y={1450} label="4.2: irAmbitoPrincipal()" isReturn={true} show={step >= 22} />
+
+        </svg>
+      </div>
+    );
+  };
+
+  const renderShoppingListCreation = () => {
+    // ... [Mismo código que antes para Shopping List Creation] ...
+    const pos = { user: 60, ui: 260, control: 460, lista: 660, ingredientes: 860 };
+    const svgHeight = 2200; 
+
+    return (
+      <div className="min-w-[1000px] p-8 flex justify-center items-start pt-16">
+        <svg width="1000" height={svgHeight} viewBox={`0 0 1000 ${svgHeight}`} className="drop-shadow-2xl font-sans">
+             <defs>
+                <marker id="arrowhead-filled" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
+                </marker>
+                <marker id="arrowhead-open" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polyline points="0 0, 10 3.5, 0 7" fill="none" stroke="#94a3b8" strokeWidth="1.5" />
+                </marker>
+            </defs>
+
+            {/* LIFELINES */}
+            <g className={`transition-opacity duration-1000 ${step >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                <Lifeline x={pos.user} height={svgHeight - 50} label="Usuario" type="actor" color="text-slate-300" />
+                <Lifeline x={pos.ui} height={svgHeight - 50} label="Crear lista de la compra" subLabel="UI" type="boundary" icon={Layout} color="text-blue-400" />
+                <Lifeline x={pos.control} height={svgHeight - 50} label="Crear lista de la compra" type="control" icon={RefreshCw} color="text-blue-400" />
+                <Lifeline x={pos.lista} height={svgHeight - 50} label=": Lista" type="entity" icon={ShoppingCart} color="text-sky-300" />
+                <Lifeline x={pos.ingredientes} height={svgHeight - 50} label=": Ingredientes" type="entity" icon={Utensils} color="text-sky-300" />
+            </g>
+
+            {/* --- ACCESO --- */}
+            <ActivationBox x={pos.ui} y={130} height={100} show={step >= 1} />
+            <ActivationBox x={pos.control} y={140} height={80} show={step >= 1} />
+            <Message fromX={pos.user} toX={pos.ui} y={140} label="1: AccederLista()" show={step >= 1} />
+            <Message fromX={pos.ui} toX={pos.control} y={150} label="1.1: AccederLista()" show={step >= 2} />
+            <Message fromX={pos.control} toX={pos.ui} y={180} label="1.2: DevolverLista()" isReturn={true} show={step >= 3} />
+            <Message fromX={pos.ui} toX={pos.user} y={200} label="1.3: MostrarLista()" isReturn={true} show={step >= 4} />
+
+            {/* --- SELECCION ORIGEN --- */}
+            <ActivationBox x={pos.ui} y={260} height={60} show={step >= 5} />
+            <ActivationBox x={pos.control} y={270} height={350} show={step >= 5} />
+            <Message fromX={pos.user} toX={pos.ui} y={270} label="2: SeleccionarOrigenIngredintes()" show={step >= 5} />
+            <Message fromX={pos.ui} toX={pos.control} y={280} label="2.1: SeleccionarOrigenIngredintes()" show={step >= 6} />
+
+            {/* --- ALT BLOCKS --- */}
+            <GroupFrame x={pos.user - 40} y={320} width={pos.ingredientes - pos.user + 50} height={200} type="alt" label="[ClickOn_OrigenPlanificacion == true]" show={step >= 7} />
+            <GroupFrame x={pos.user} y={360} width={pos.ingredientes - pos.user + 20} height={40} type="ref" label="Planificacion semanal de menús Sequence Diagram" show={step >= 7} />
+
+            <AltDivider x={pos.user - 40} y={420} width={pos.ingredientes - pos.user + 50} label="[ClickOn_misRecetas == true]" show={step >= 8} />
+            <GroupFrame x={pos.user} y={460} width={pos.ingredientes - pos.user + 20} height={40} type="ref" label="Administracion de recetas Sequence Diagram" show={step >= 8} />
+
+            {/* --- LLENAR LISTA --- */}
+            <ActivationBox x={pos.lista} y={560} height={40} show={step >= 9} />
+            <ActivationBox x={pos.ingredientes} y={560} height={40} show={step >= 9} />
+            <Message fromX={pos.control} toX={pos.lista} y={570} label="2.1.1: llenarLista()" show={step >= 9} />
+            <Message fromX={pos.lista} toX={pos.ingredientes} y={570} label="3: SeleccionarIngredientes()" show={step >= 10} />
+
+            {/* --- REVISAR LISTA --- */}
+            <ActivationBox x={pos.ui} y={640} height={120} show={step >= 11} />
+            <ActivationBox x={pos.control} y={650} height={100} show={step >= 11} />
+            <ActivationBox x={pos.lista} y={660} height={80} show={step >= 11} />
+            <ActivationBox x={pos.ingredientes} y={670} height={40} show={step >= 11} />
+
+            <Message fromX={pos.user} toX={pos.ui} y={650} label="4: RevisarLista()" show={step >= 11} />
+            <Message fromX={pos.ui} toX={pos.control} y={660} label="4.1: RevisarLista()" show={step >= 12} />
+            <Message fromX={pos.control} toX={pos.lista} y={670} label="4.1.1: RevisarLista()" show={step >= 13} />
+            <Message fromX={pos.lista} toX={pos.ingredientes} y={680} label="4.1.1.1: RevisarIngredientes()" show={step >= 14} />
+            
+            <Message fromX={pos.ingredientes} toX={pos.lista} y={700} label="4.1.1.2: DevolverIngredientes()" isReturn={true} show={step >= 15} />
+            <Message fromX={pos.lista} toX={pos.control} y={720} label="4.1.2: DevolverLista()" isReturn={true} show={step >= 16} />
+            <Message fromX={pos.control} toX={pos.ui} y={740} label="4.2: DevolverLista()" isReturn={true} show={step >= 17} />
+            <Message fromX={pos.ui} toX={pos.user} y={760} label="4.3: MostrarLista()" isReturn={true} show={step >= 18} />
+
+            {/* --- AJUSTAR CANTIDADES --- */}
+            <GroupFrame x={pos.user - 40} y={800} width={pos.ingredientes - pos.user + 50} height={350} type="alt" label="[ClickOn_AjustarCantidades == true]" show={step >= 19} />
+            <GroupFrame x={pos.user - 20} y={830} width={pos.ingredientes - pos.user + 30} height={250} type="loop" label="[por cada ingrediente ajustado]" show={step >= 20} />
+
+            <ActivationBox x={pos.ui} y={850} height={150} show={step >= 21} />
+            <ActivationBox x={pos.control} y={860} height={120} show={step >= 21} />
+            <ActivationBox x={pos.ingredientes} y={870} height={100} show={step >= 21} />
+
+            <Message fromX={pos.user} toX={pos.ui} y={870} label="5: AjustarCantidad()" show={step >= 21} />
+            <Message fromX={pos.ui} toX={pos.control} y={880} label="6: AjustarCantidad()" show={step >= 22} />
+            <Message fromX={pos.control} toX={pos.ingredientes} y={890} label="6.1: AjustarNumIngrediente()" show={step >= 23} />
+            
+            <Message fromX={pos.ingredientes} toX={pos.control} y={920} label="6.2: ReturnNumIngredientes()" isReturn={true} show={step >= 24} />
+            <Message fromX={pos.control} toX={pos.ui} y={940} label="6.3: RecalcularPrecio()" isReturn={true} show={step >= 25} />
+            <Message fromX={pos.ui} toX={pos.user} y={960} label="5.1: MostrarPrecio()" isReturn={true} show={step >= 26} />
+
+            {/* --- GUARDAR LISTA (PASO 7) --- */}
+            <ActivationBox x={pos.ui} y={1200} height={80} show={step >= 27} />
+            <ActivationBox x={pos.control} y={1210} height={60} show={step >= 27} />
+            <ActivationBox x={pos.lista} y={1220} height={40} show={step >= 27} />
+            <ActivationBox x={pos.ingredientes} y={1230} height={20} show={step >= 27} />
+
+            <Message fromX={pos.user} toX={pos.ui} y={1210} label="7: guardarLista()" show={step >= 27} />
+            <Message fromX={pos.ui} toX={pos.control} y={1220} label="7.1: guardarLista()" show={step >= 27} />
+            <Message fromX={pos.control} toX={pos.lista} y={1230} label="7.1.1: guardarLista()" show={step >= 27} />
+            <Message fromX={pos.lista} toX={pos.ingredientes} y={1240} label="7.1.1.1: GuardarIngredientes()" show={step >= 27} />
+            
+            <Message fromX={pos.ingredientes} toX={pos.lista} y={1255} label="7.1.1.2: getIngredientes()" isReturn={true} show={step >= 28} />
+            <Message fromX={pos.lista} toX={pos.control} y={1265} label="7.1.2: getLista()" isReturn={true} show={step >= 28} />
+            <Message fromX={pos.control} toX={pos.ui} y={1275} label="7.2: getLista()" isReturn={true} show={step >= 28} />
+            <Message fromX={pos.ui} toX={pos.user} y={1285} label="7.3: getLista()" isReturn={true} show={step >= 28} />
+
+            {/* --- MODIFICAR LISTA (ALT) --- */}
+            <GroupFrame x={pos.user - 40} y={1320} width={pos.ingredientes - pos.user + 50} height={500} type="alt" label="[ClickOn_modificarLista == true]" show={step >= 29} />
+            
+            {/* --- LOOP MODIFICAR --- */}
+            <GroupFrame x={pos.user - 20} y={1350} width={pos.ingredientes - pos.user + 30} height={180} type="loop" label="[Hasta que terminar de modificar ingredientes]" show={step >= 30} />
+            
+            <ActivationBox x={pos.ui} y={1380} height={80} show={step >= 31} />
+            <ActivationBox x={pos.control} y={1390} height={60} show={step >= 31} />
+            <ActivationBox x={pos.lista} y={1400} height={40} show={step >= 31} />
+            <ActivationBox x={pos.ingredientes} y={1410} height={20} show={step >= 31} />
+
+            <Message fromX={pos.user} toX={pos.ui} y={1390} label="8: deseleccionarIngrediente()" show={step >= 31} />
+            <Message fromX={pos.ui} toX={pos.control} y={1400} label="8.1: deseleccionarIngrediente()" show={step >= 31} />
+            <Message fromX={pos.control} toX={pos.lista} y={1410} label="8.1.1: deseleccionarIngrediente()" show={step >= 31} />
+            <Message fromX={pos.lista} toX={pos.ingredientes} y={1420} label="8.1.1.1: deseleccionarIngrediente()" show={step >= 31} />
+
+            {/* --- SALIR (ELSE) --- */}
+            <AltDivider x={pos.user - 40} y={1550} width={pos.ingredientes - pos.user + 50} label="[ClickOn_modificarLista == False]" show={step >= 32} />
+            
+            <ActivationBox x={pos.ui} y={1580} height={80} show={step >= 33} />
+            <ActivationBox x={pos.control} y={1590} height={60} show={step >= 33} />
+            
+            <Message fromX={pos.user} toX={pos.ui} y={1590} label="9: salirLista()" show={step >= 33} />
+            <Message fromX={pos.ui} toX={pos.control} y={1600} label="9.1: salirLista()" show={step >= 33} />
+            <Message fromX={pos.control} toX={pos.ui} y={1620} label="9.1.1: irAmbitoPrincipal()" isReturn={true} show={step >= 34} />
+            <Message fromX={pos.ui} toX={pos.user} y={1640} label="9.1.1.1: irAmbitoPrincipal()" isReturn={true} show={step >= 34} />
+
+        </svg>
+      </div>
+    );
+  };
+
+  const renderShareRecipe = () => {
+    // ... [Mismo código que antes para Share Recipe] ...
+    const pos = { 
+        user: 60, 
+        ui: 230, 
+        control: 380, 
+        recetas: 530, 
+        public: 680, 
+        comunidad: 830, 
+        privado: 980, 
+        comunidadActor: 1130, 
+        usuarioExt: 1280 
+    };
+    const svgHeight = 1600;
+
+    return (
+      <div className="min-w-[1400px] p-8 flex justify-center items-start pt-16">
+        <svg width="1400" height={svgHeight} viewBox={`0 0 1400 ${svgHeight}`} className="drop-shadow-2xl font-sans">
+             <defs>
+                <marker id="arrowhead-filled" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
+                </marker>
+                <marker id="arrowhead-open" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polyline points="0 0, 10 3.5, 0 7" fill="none" stroke="#94a3b8" strokeWidth="1.5" />
+                </marker>
+            </defs>
+
+            {/* LIFELINES */}
+            <g className={`transition-opacity duration-1000 ${step >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                <Lifeline x={pos.user} height={svgHeight - 50} label="Usuario" type="actor" color="text-slate-300" />
+                <Lifeline x={pos.ui} height={svgHeight - 50} label="CompartirRecetaUI" type="boundary" icon={Layout} color="text-blue-400" />
+                <Lifeline x={pos.control} height={svgHeight - 50} label="CompartirReceta" type="control" icon={RefreshCw} color="text-blue-400" />
+                <Lifeline x={pos.recetas} height={svgHeight - 50} label=":Recetas" type="entity" icon={BookOpen} color="text-sky-300" />
+                <Lifeline x={pos.public} height={svgHeight - 50} label=":ComparticionPublica" type="entity" icon={Globe2} color="text-sky-300" />
+                <Lifeline x={pos.comunidad} height={svgHeight - 50} label=":ComparticionComunidad" type="entity" icon={Users} color="text-sky-300" />
+                <Lifeline x={pos.privado} height={svgHeight - 50} label=":ComparticionPrivada" type="entity" icon={Shield} color="text-sky-300" />
+                <Lifeline x={pos.comunidadActor} height={svgHeight - 50} label=":Comunidad" type="actor" color="text-blue-300" />
+                <Lifeline x={pos.usuarioExt} height={svgHeight - 50} label=":usuarioExt" type="actor" color="text-blue-300" />
+            </g>
+
+            {/* 1. irAmbitoCompartir */}
+            <ActivationBox x={pos.ui} y={130} height={100} show={step >= 1} />
+            <ActivationBox x={pos.control} y={140} height={80} show={step >= 1} />
+            <Message fromX={pos.user} toX={pos.ui} y={140} label="1: irAmbitoCompartir()" show={step >= 1} />
+            <Message fromX={pos.ui} toX={pos.control} y={150} label="1.1: irAmbitoCompartir()" show={step >= 2} />
+            <Message fromX={pos.control} toX={pos.ui} y={180} label="1.2: mostrarAmbitoCompartir()" isReturn={true} show={step >= 3} />
+            <Message fromX={pos.ui} toX={pos.user} y={200} label="1.3: mostrarAmbitoCompartir()" isReturn={true} show={step >= 4} />
+
+            {/* 2. compartirReceta */}
+            <ActivationBox x={pos.ui} y={250} height={150} show={step >= 5} />
+            <ActivationBox x={pos.control} y={260} height={130} show={step >= 5} />
+            <Message fromX={pos.user} toX={pos.ui} y={260} label="2: compartirReceta()" show={step >= 5} />
+            <Message fromX={pos.ui} toX={pos.control} y={270} label="2.1: compartirReceta()" show={step >= 6} />
+            
+            <Message fromX={pos.control} toX={pos.ui} y={300} label="2.2: formularioRequisitos()" isReturn={true} show={step >= 7} />
+            <Message fromX={pos.ui} toX={pos.user} y={320} label="2.3: formularioRequisitos()" isReturn={true} show={step >= 8} />
+
+            {/* 3. getFormulario */}
+            <ActivationBox x={pos.ui} y={380} height={60} show={step >= 9} />
+            <ActivationBox x={pos.control} y={390} height={700} show={step >= 9} />
+            <Message fromX={pos.user} toX={pos.ui} y={390} label="3: getFormulario()" show={step >= 9} />
+            <Message fromX={pos.ui} toX={pos.control} y={400} label="3.1: getFormulario()" show={step >= 10} />
+
+            {/* --- ALT PRINCIPAL --- */}
+            <GroupFrame x={pos.user - 40} y={430} width={1380} height={600} type="alt" label="[ClickOn_CompartirPublico == true]" show={step >= 11} />
+
+            {/* PUBLICO */}
+            <ActivationBox x={pos.recetas} y={460} height={60} show={step >= 12} />
+            <ActivationBox x={pos.public} y={520} height={40} show={step >= 14} />
+            
+            <Message fromX={pos.control} toX={pos.recetas} y={470} label="3.1.1: selectReceta()" show={step >= 12} />
+            <Message fromX={pos.recetas} toX={pos.control} y={500} label="3.1.2: getReceta()" isReturn={true} show={step >= 13} />
+            <Message fromX={pos.control} toX={pos.public} y={530} label="3.1.3: compartirReceta()" show={step >= 14} />
+
+            {/* COMUNIDAD */}
+            <AltDivider x={pos.user - 40} y={580} width={1380} label="[ClickOn_CompartirComunidad == true]" show={step >= 15} />
+            
+            <ActivationBox x={pos.recetas} y={610} height={60} show={step >= 16} />
+            <ActivationBox x={pos.comunidad} y={670} height={40} show={step >= 18} />
+            <ActivationBox x={pos.comunidadActor} y={680} height={30} show={step >= 19} />
+
+            <Message fromX={pos.control} toX={pos.recetas} y={620} label="3.1.4: selectReceta()" show={step >= 16} />
+            <Message fromX={pos.recetas} toX={pos.control} y={650} label="3.1.5: getReceta()" isReturn={true} show={step >= 17} />
+            <Message fromX={pos.control} toX={pos.comunidad} y={680} label="3.1.6: compartirReceta()" show={step >= 18} />
+            <Message fromX={pos.comunidad} toX={pos.comunidadActor} y={700} label="4: notificaComunidad()" show={step >= 19} />
+
+            {/* PRIVADO */}
+            <AltDivider x={pos.user - 40} y={740} width={1380} label="[ClickOn_CompartirPrivado == true]" show={step >= 20} />
+            
+            <ActivationBox x={pos.recetas} y={770} height={60} show={step >= 21} />
+            <ActivationBox x={pos.privado} y={830} height={100} show={step >= 23} />
+            
+            <Message fromX={pos.control} toX={pos.recetas} y={780} label="3.1.7: selectReceta()" show={step >= 21} />
+            <Message fromX={pos.recetas} toX={pos.control} y={810} label="3.1.8: getReceta()" isReturn={true} show={step >= 22} />
+            <Message fromX={pos.control} toX={pos.privado} y={840} label="3.1.9: compartirReceta()" show={step >= 23} />
+
+            {/* ALT USER REGISTER */}
+            <GroupFrame x={pos.privado + 20} y={850} width={400} height={100} type="alt" label="[userRegister == False]" show={step >= 24} />
+            <ActivationBox x={pos.usuarioExt} y={870} height={60} show={step >= 25} />
+            <Message fromX={pos.privado} toX={pos.usuarioExt} y={880} label="5: sendMail()" show={step >= 25} />
+            <Message fromX={pos.privado} toX={pos.usuarioExt} y={910} label="6: invitacionRegistro()" show={step >= 26} />
+
+            {/* SALIR */}
+            <ActivationBox x={pos.ui} y={1150} height={80} show={step >= 27} />
+            <ActivationBox x={pos.control} y={1160} height={60} show={step >= 27} />
+            
+            <Message fromX={pos.user} toX={pos.ui} y={1160} label="7: salirCompartir()" show={step >= 27} />
+            <Message fromX={pos.ui} toX={pos.control} y={1170} label="7.1: salirCompartir()" show={step >= 28} />
+            <Message fromX={pos.control} toX={pos.ui} y={1200} label="7.2: irAmbitoPrincipal()" isReturn={true} show={step >= 29} />
+            <Message fromX={pos.ui} toX={pos.user} y={1220} label="8: irAmbitoPrincipal()" isReturn={true} show={step >= 30} />
+
+        </svg>
+      </div>
+    );
+  };
+
+  const renderFavoritesRatings = () => {
+    // ... [Mismo código que antes para Favorites Ratings] ...
+    const pos = { 
+        user: 60, 
+        ui: 230, 
+        control: 430, 
+        receta: 630, 
+        favoritos: 830, 
+        valorar: 1030 
+    };
+    const svgHeight = 2500;
+
+    return (
+      <div className="min-w-[1200px] p-8 flex justify-center items-start pt-16">
+        <svg width="1200" height={svgHeight} viewBox={`0 0 1200 ${svgHeight}`} className="drop-shadow-2xl font-sans">
+             <defs>
+                <marker id="arrowhead-filled" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
+                </marker>
+                <marker id="arrowhead-open" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                    <polyline points="0 0, 10 3.5, 0 7" fill="none" stroke="#94a3b8" strokeWidth="1.5" />
+                </marker>
+            </defs>
+
+            {/* LIFELINES */}
+            <g className={`transition-opacity duration-1000 ${step >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                <Lifeline x={pos.user} height={svgHeight - 50} label="Usuario" type="actor" color="text-slate-300" />
+                <Lifeline x={pos.ui} height={svgHeight - 50} label="Favoritos y valoraciones" subLabel="UI" type="boundary" icon={Layout} color="text-blue-400" />
+                <Lifeline x={pos.control} height={svgHeight - 50} label="Favoritos y valoraciones" type="control" icon={RefreshCw} color="text-blue-400" />
+                <Lifeline x={pos.receta} height={svgHeight - 50} label=": Receta" type="entity" icon={BookOpen} color="text-sky-300" />
+                <Lifeline x={pos.favoritos} height={svgHeight - 50} label=": Favoritos" type="entity" icon={Heart} color="text-sky-300" />
+                <Lifeline x={pos.valorar} height={svgHeight - 50} label=": Valorar" type="entity" icon={Star} color="text-sky-300" />
+            </g>
+
+            {/* --- EXPLORAR RECETAS --- */}
+            <ActivationBox x={pos.ui} y={130} height={100} show={step >= 1} />
+            <ActivationBox x={pos.control} y={140} height={80} show={step >= 1} />
+            <Message fromX={pos.user} toX={pos.ui} y={140} label="1: ExplorarRecetas()" show={step >= 1} />
+            <Message fromX={pos.ui} toX={pos.control} y={150} label="1.1: ExplorarRecetas()" show={step >= 2} />
+            
+            <ActivationBox x={pos.receta} y={160} height={40} show={step >= 3} />
+            <Message fromX={pos.control} toX={pos.receta} y={160} label="1.1.1: CargarRecetas()" show={step >= 3} />
+            <Message fromX={pos.receta} toX={pos.control} y={190} label="1.1.2: DevolverReceta()" isReturn={true} show={step >= 4} />
+            
+            <Message fromX={pos.control} toX={pos.ui} y={220} label="1.2: DevolverReceta()" isReturn={true} show={step >= 5} />
+            <Message fromX={pos.ui} toX={pos.user} y={250} label="2: MostrarRecetas()" isReturn={true} show={step >= 6} />
+
+            {/* --- GUARDAR FAVORITOS --- */}
+            <ActivationBox x={pos.ui} y={320} height={150} show={step >= 7} />
+            <ActivationBox x={pos.control} y={330} height={130} show={step >= 7} />
+            <Message fromX={pos.user} toX={pos.ui} y={330} label="4: GuardarFavoritos()" show={step >= 7} />
+            <Message fromX={pos.ui} toX={pos.control} y={340} label="3: guardarReceta()" show={step >= 8} />
+            
+            <ActivationBox x={pos.receta} y={350} height={40} show={step >= 9} />
+            <Message fromX={pos.control} toX={pos.receta} y={350} label="3.1: CargarRecetas()" show={step >= 9} />
+            
+            <ActivationBox x={pos.favoritos} y={380} height={40} show={step >= 10} />
+            <Message fromX={pos.receta} toX={pos.favoritos} y={380} label="3.1.1: AddFavorito()" show={step >= 10} />
+            <Message fromX={pos.favoritos} toX={pos.receta} y={400} label="3.1.2: DevolverReceta()" isReturn={true} show={step >= 11} />
+            
+            <Message fromX={pos.receta} toX={pos.control} y={420} label="3.2: DevolverReceta()" isReturn={true} show={step >= 12} />
+            <Message fromX={pos.control} toX={pos.ui} y={440} label="3.3: DevolverReceta()" isReturn={true} show={step >= 13} />
+            <Message fromX={pos.ui} toX={pos.user} y={460} label="3.3.1: MostrarRecetas()" isReturn={true} show={step >= 14} />
+
+            {/* --- VER RECETA --- */}
+            <ActivationBox x={pos.ui} y={550} height={120} show={step >= 15} />
+            <ActivationBox x={pos.control} y={560} height={100} show={step >= 15} />
+            <Message fromX={pos.user} toX={pos.ui} y={560} label="5: verReceta()" show={step >= 15} />
+            <Message fromX={pos.ui} toX={pos.control} y={570} label="6: verReceta()" show={step >= 16} />
+            
+            <ActivationBox x={pos.receta} y={580} height={40} show={step >= 17} />
+            <Message fromX={pos.control} toX={pos.receta} y={580} label="6.1: verReceta()" show={step >= 17} />
+            <Message fromX={pos.receta} toX={pos.control} y={610} label="6.2: getReceta()" isReturn={true} show={step >= 18} />
+            
+            <Message fromX={pos.control} toX={pos.ui} y={640} label="6.3: getReceta()" isReturn={true} show={step >= 19} />
+            <Message fromX={pos.ui} toX={pos.user} y={670} label="6.4: getReceta()" isReturn={true} show={step >= 20} />
+
+            {/* --- VALORAR SIMPLE --- */}
+            <ActivationBox x={pos.ui} y={750} height={180} show={step >= 21} />
+            <ActivationBox x={pos.control} y={760} height={160} show={step >= 21} />
+            <Message fromX={pos.user} toX={pos.ui} y={760} label="7: Valorar Multidimensionalmente()" show={step >= 21} />
+            <Message fromX={pos.ui} toX={pos.control} y={770} label="8: ValorarReceta()" show={step >= 22} />
+            
+            <ActivationBox x={pos.receta} y={780} height={120} show={step >= 23} />
+            <Message fromX={pos.control} toX={pos.receta} y={780} label="8.1: CargarReceta()" show={step >= 23} />
+            
+            <ActivationBox x={pos.valorar} y={800} height={40} show={step >= 24} />
+            <Message fromX={pos.receta} toX={pos.valorar} y={800} label="8.1.1: GuardarValoracion()" show={step >= 24} />
+            <Message fromX={pos.valorar} toX={pos.receta} y={830} label="8.1.2: DevolverValoracion()" isReturn={true} show={step >= 25} />
+            
+            <Message fromX={pos.receta} toX={pos.control} y={850} label="8.2: DevolverValoracion()" isReturn={true} show={step >= 26} />
+            <Message fromX={pos.control} toX={pos.ui} y={870} label="8.3: DevolverValoracion()" isReturn={true} show={step >= 27} />
+            <Message fromX={pos.ui} toX={pos.user} y={890} label="7.1: MostrarValoracion()" isReturn={true} show={step >= 28} />
+
+            {/* --- VALORACION DETALLADA (ALT) --- */}
+            {/* Las cajas de activación largas que cubren todo el ALT */}
+            <ActivationBox x={pos.ui} y={970} height={1280} show={step >= 29} />
+            <ActivationBox x={pos.control} y={980} height={1260} show={step >= 29} />
+
+            <Message fromX={pos.user} toX={pos.ui} y={970} label="9: valoracion()" show={step >= 29} />
+            <Message fromX={pos.ui} toX={pos.control} y={990} label="9.1: valoracion()" show={step >= 30} />
+
+            <GroupFrame x={pos.user - 40} y={1030} width={1150} height={880} type="alt" label="Valoraciones Detalladas" show={step >= 31} />
+
+            {/* SABOR POSITIVA */}
+             <ActivationBox x={pos.valorar} y={1050} height={40} show={step >= 31} />
+            <Message fromX={pos.control} toX={pos.valorar} y={1060} label="9.1.1: guardarComentarioSabor()" show={step >= 31} />
+            <Message fromX={pos.valorar} toX={pos.valorar} y={1080} label="9.1.1.1: asignarPuntuacionSabor()" show={step >= 32} />
+
+            {/* SABOR NEGATIVA */}
+            <AltDivider x={pos.user - 40} y={1150} width={1150} label="[valoracionSaborNegativa]" show={step >= 33} />
+             <ActivationBox x={pos.valorar} y={1160} height={40} show={step >= 33} />
+            <Message fromX={pos.control} toX={pos.valorar} y={1170} label="9.1.2: guardarComentario()" show={step >= 33} />
+            <Message fromX={pos.valorar} toX={pos.valorar} y={1190} label="9.1.2.1: asignarPuntuacionSabor()" show={step >= 34} />
+            <Message fromX={pos.control} toX={pos.ui} y={1220} label="9.1.2: formularioPropuesta()" isReturn={true} show={step >= 35} />
+            <Message fromX={pos.ui} toX={pos.user} y={1240} label="9.1.3: formularioPropuesta()" isReturn={true} show={step >= 36} />
+            <Message fromX={pos.user} toX={pos.ui} y={1260} label="10: guardarPropuesta()" show={step >= 37} />
+
+             {/* DIFICULTAD POSITIVA */}
+             <AltDivider x={pos.user - 40} y={1350} width={1150} label="[valoracionDificultadPositiva]" show={step >= 38} />
+              <ActivationBox x={pos.valorar} y={1360} height={40} show={step >= 38} />
+             <Message fromX={pos.control} toX={pos.valorar} y={1370} label="9.1.3: guardarComentarioDificultad()" show={step >= 38} />
+             <Message fromX={pos.valorar} toX={pos.valorar} y={1390} label="9.1.3.1: asignarPuntuacionDificultad()" show={step >= 39} />
+
+             {/* DIFICULTAD NEGATIVA */}
+             <AltDivider x={pos.user - 40} y={1450} width={1150} label="[valoracionDificultadNegativa]" show={step >= 40} />
+              <ActivationBox x={pos.valorar} y={1460} height={40} show={step >= 40} />
+             <Message fromX={pos.control} toX={pos.valorar} y={1470} label="9.1.5: guardarComentarioDificultad()" show={step >= 40} />
+             <Message fromX={pos.valorar} toX={pos.valorar} y={1490} label="9.1.5.1: asignarPuntuacionDificultad()" show={step >= 41} />
+             <Message fromX={pos.control} toX={pos.ui} y={1520} label="9.1.4: formularioPropuesta()" isReturn={true} show={step >= 42} />
+             <Message fromX={pos.ui} toX={pos.user} y={1540} label="9.1.4.1: formularioPropuesta()" isReturn={true} show={step >= 43} />
+             <Message fromX={pos.user} toX={pos.ui} y={1560} label="11: guardarPropuesta()" show={step >= 44} />
+
+             {/* TIEMPO POSITIVA */}
+             <AltDivider x={pos.user - 40} y={1650} width={1150} label="[valoracionTiempoPositiva]" show={step >= 45} />
+              <ActivationBox x={pos.valorar} y={1660} height={40} show={step >= 45} />
+             <Message fromX={pos.control} toX={pos.valorar} y={1670} label="9.1.6: guardarComentarioTiempo()" show={step >= 45} />
+             <Message fromX={pos.valorar} toX={pos.valorar} y={1690} label="9.1.6.1: asignarPuntuacionTiempo()" show={step >= 46} />
+
+             {/* TIEMPO NEGATIVA */}
+             <AltDivider x={pos.user - 40} y={1750} width={1150} label="[valoracionTiempoNegativa]" show={step >= 47} />
+              <ActivationBox x={pos.valorar} y={1760} height={40} show={step >= 47} />
+             <Message fromX={pos.control} toX={pos.valorar} y={1770} label="9.1.7: guardarComentarioTiempo()" show={step >= 47} />
+             <Message fromX={pos.valorar} toX={pos.valorar} y={1790} label="9.1.7.1: asignarPuntuacionTiempo()" show={step >= 48} />
+             <Message fromX={pos.control} toX={pos.ui} y={1820} label="9.1.8: formularioPropuesta()" isReturn={true} show={step >= 49} />
+             <Message fromX={pos.ui} toX={pos.user} y={1840} label="9.1.8.1: formularioPropuesta()" isReturn={true} show={step >= 50} />
+             <Message fromX={pos.user} toX={pos.ui} y={1860} label="12: guardarPropuesta()" show={step >= 51} />
+
+             {/* --- COMENTARIOS Y EDICIÓN --- */}
+             <GroupFrame x={pos.user - 40} y={2000} width={1150} height={200} type="alt" label="[ClickOn_comentar == true]" show={step >= 52} />
+             <ActivationBox x={pos.ui} y={2020} height={60} show={step >= 52} />
+             <ActivationBox x={pos.control} y={2030} height={40} show={step >= 52} />
+             <Message fromX={pos.user} toX={pos.ui} y={2030} label="13: Comentar()" show={step >= 52} />
+             <Message fromX={pos.ui} toX={pos.control} y={2040} label="13.1: AñadirComentario()" show={step >= 53} />
+             <ActivationBox x={pos.receta} y={2050} height={30} show={step >= 54} />
+             <Message fromX={pos.control} toX={pos.receta} y={2050} label="13.1.1: CargarReceta()" show={step >= 54} />
+             <ActivationBox x={pos.valorar} y={2060} height={30} show={step >= 55} />
+             <Message fromX={pos.receta} toX={pos.valorar} y={2060} label="13.1.1.1: RealizarComentario()" show={step >= 55} />
+
+             {/* EDICION */}
+             <AltDivider x={pos.user - 40} y={2120} width={1150} label="[ClickOn_modificarComentario == true]" show={step >= 56} />
+             <ActivationBox x={pos.ui} y={2140} height={80} show={step >= 56} />
+             <ActivationBox x={pos.control} y={2150} height={60} show={step >= 56} />
+             <Message fromX={pos.user} toX={pos.ui} y={2150} label="14: ModificarComentario()" show={step >= 56} />
+             <Message fromX={pos.ui} toX={pos.control} y={2160} label="14.1: ModificarComentario()" show={step >= 57} />
+             <ActivationBox x={pos.receta} y={2170} height={30} show={step >= 58} />
+             <Message fromX={pos.control} toX={pos.receta} y={2170} label="14.1.1: CargarReceta()" show={step >= 58} />
+             <ActivationBox x={pos.valorar} y={2180} height={30} show={step >= 59} />
+             <Message fromX={pos.receta} toX={pos.valorar} y={2180} label="14.1.1.1: RealizarModificacion()" show={step >= 59} />
+             <Message fromX={pos.valorar} toX={pos.control} y={2210} label="14.1.1.1.1: DevolverModificacion()" isReturn={true} show={step >= 60} />
+             <Message fromX={pos.control} toX={pos.ui} y={2230} label="14.1.2: MarcarEditado()" isReturn={true} show={step >= 61} />
+             <Message fromX={pos.ui} toX={pos.user} y={2250} label="14.2: MostrarEditado()" isReturn={true} show={step >= 62} />
+
+             {/* --- RECOMENDACIONES (IA/PATRONES) --- */}
+             <GroupFrame x={pos.user - 40} y={2320} width={1150} height={300} type="alt" label="[PatronDeGustos == true]" show={step >= 63} />
+             <ActivationBox x={pos.ui} y={2350} height={60} show={step >= 63} />
+             <ActivationBox x={pos.control} y={2360} height={40} show={step >= 63} />
+             <ActivationBox x={pos.receta} y={2370} height={30} show={step >= 63} />
+             <ActivationBox x={pos.valorar} y={2380} height={30} show={step >= 63} />
+
+             <Message fromX={pos.valorar} toX={pos.receta} y={2380} label="16: patronGustos()" show={step >= 64} />
+             <Message fromX={pos.receta} toX={pos.control} y={2390} label="15: sugerirRecetasPersonalizadas()" isReturn={true} show={step >= 65} />
+             <Message fromX={pos.control} toX={pos.ui} y={2410} label="15.1: sugerirRecetasPersonalizadas()" isReturn={true} show={step >= 66} />
+             <Message fromX={pos.ui} toX={pos.user} y={2430} label="15.1.1: sugerirRecetasPersonalizadas()" isReturn={true} show={step >= 67} />
+
+             {/* SIN PATRON */}
+             <AltDivider x={pos.user - 40} y={2480} width={1150} label="[PatronDeGustos == False]" show={step >= 68} />
+             <ActivationBox x={pos.ui} y={2500} height={60} show={step >= 69} />
+             <ActivationBox x={pos.control} y={2510} height={40} show={step >= 69} />
+             <ActivationBox x={pos.receta} y={2520} height={30} show={step >= 69} />
+             <ActivationBox x={pos.valorar} y={2530} height={30} show={step >= 69} />
+
+             <Message fromX={pos.valorar} toX={pos.receta} y={2530} label="17: patronValoraciones()" show={step >= 70} />
+             <Message fromX={pos.receta} toX={pos.control} y={2540} label="17.1: sugerirRecetas()" isReturn={true} show={step >= 71} />
+             <Message fromX={pos.control} toX={pos.ui} y={2560} label="17.1.1: sugerirRecetas()" isReturn={true} show={step >= 72} />
+             <Message fromX={pos.ui} toX={pos.user} y={2580} label="17.1.1.1: sugerirRecetas()" isReturn={true} show={step >= 73} />
+
+        </svg>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-950 text-white overflow-hidden font-sans selection:bg-blue-500 selection:text-white relative">
+      
+      {isMenuOpen && (
+        <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex transition-opacity duration-300">
+            <div className="w-80 bg-slate-900 h-full shadow-2xl border-r border-slate-800 p-6 flex flex-col animate-in slide-in-from-left duration-300">
+                <div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Box size={24} className="text-blue-500" />
+                        Diagramas
+                    </h2>
+                    <button onClick={() => setIsMenuOpen(false)} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
+                        <X className="text-slate-400 hover:text-white" size={24} />
+                    </button>
+                </div>
+                
+                <nav className="flex-1 space-y-2 overflow-y-auto">
+                    {diagramsList.map(diagram => (
+                        <button 
+                            key={diagram.id}
+                            onClick={() => handleDiagramChange(diagram)}
+                            className={`w-full text-left p-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                activeDiagram.id === diagram.id 
+                                    ? 'bg-blue-600/20 text-blue-400 border border-blue-600/50' 
+                                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                            }`}
+                        >
+                            <FileText size={18} />
+                            <div className="flex flex-col">
+                                <span className="font-medium text-sm">{diagram.title}</span>
+                                <span className="text-[10px] text-slate-500">{diagram.steps} pasos</span>
+                            </div>
+                        </button>
+                    ))}
+                </nav>
+
+                <div className="pt-4 border-t border-slate-800 text-xs text-slate-500 text-center">
+                    Sistema de Visualización v1.1.2
+                </div>
+            </div>
+            <div className="flex-1" onClick={() => setIsMenuOpen(false)} /> 
+        </div>
+      )}
+
+      <div className="flex justify-between items-center px-6 py-3 bg-slate-900 border-b border-slate-800 shadow-xl z-20 relative">
+        <div className="flex items-center gap-4">
+            <button onClick={() => setIsMenuOpen(true)} className="p-2 -ml-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors" title="Abrir Menú">
+                <Menu size={24} />
+            </button>
+            <div className="h-6 w-px bg-slate-700 mx-1"></div>
+            <h1 className="text-lg font-bold flex items-center gap-2 text-slate-200">
+                <FileText size={20} className="text-blue-400"/>
+                {activeDiagram.title}
+            </h1>
+        </div>
+        
+        <div className="flex gap-4 items-center">
+            {/* --- CRONÓMETRO --- */}
+            <div className="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-md border border-slate-700 mx-2">
+                <Timer size={16} className={timerSeconds >= 140 ? "text-red-500" : "text-blue-400"} />
+                <span className={`font-mono text-sm min-w-[45px] text-center select-none ${getTimerStyle()}`}>
+                    {formatTime(timerSeconds)}
+                </span>
+                <button 
+                    onClick={toggleTimer} 
+                    className="hover:text-white text-slate-400 transition-colors focus:outline-none"
+                    title={isTimerRunning ? "Pausar" : "Iniciar"}
+                >
+                    {isTimerRunning ? <PauseCircle size={16} /> : <PlayCircle size={16} />}
+                </button>
+                <button 
+                    onClick={resetTimer} 
+                    className="hover:text-red-400 text-slate-400 transition-colors focus:outline-none" 
+                    title="Resetear"
+                >
+                    <RotateCcw size={16} />
+                </button>
+            </div>
+
+            <span className="text-sm font-mono text-slate-400 bg-slate-800 px-2 py-1 rounded border border-slate-700">
+                {step === totalSteps ? 'FINAL' : `Paso ${step} / ${totalSteps}`}
+            </span>
+            <button onClick={reset} className="p-2 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white" title="Reiniciar">
+                <RefreshCw size={18} />
+            </button>
+            <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
+                <button onClick={prevStep} className="p-2 hover:bg-slate-700 rounded transition-colors text-slate-300" disabled={step === 0}>
+                    <ArrowLeft size={20} />
+                </button>
+                <button onClick={nextStep} className="p-2 hover:bg-blue-600 rounded transition-colors bg-blue-700 text-white shadow-lg ml-1" disabled={step === totalSteps}>
+                    {step === totalSteps ? <Globe size={20} /> : (step === 0 ? <Play size={20} fill="currentColor" /> : <ArrowRight size={20} />)}
+                </button>
+            </div>
+        </div>
+      </div>
+
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-auto bg-[#1e1e1e] relative cursor-pointer" 
+        onClick={nextStep}
+      >
+        
+        <div className="absolute inset-0 opacity-5 pointer-events-none" 
+             style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '40px 40px', height: '100%' }}>
+        </div>
+
+        {activeDiagram.id === 'main-sequence' && (
+            step === totalSteps ? renderWebEmbed() : renderMainSequence()
+        )}
+
+        {activeDiagram.id === 'global-user-mgmt' && (
+            step === totalSteps ? renderWebEmbed() : renderGlobalUserManagement()
+        )}
+
+        {activeDiagram.id === 'recipe-mgmt' && (
+            step === totalSteps ? renderWebEmbed() : renderRecipeManagement()
+        )}
+
+        {activeDiagram.id === 'search-discover' && (
+            step === totalSteps ? renderWebEmbed() : renderSearchAndDiscover()
+        )}
+
+        {activeDiagram.id === 'shopping-list' && (
+            step === totalSteps ? renderShoppingListCreation() : renderShoppingListCreation()
+        )}
+
+        {activeDiagram.id === 'share-recipe' && (
+            step === totalSteps ? renderShareRecipe() : renderShareRecipe()
+        )}
+
+        {activeDiagram.id === 'favorites-ratings' && (
+            step === totalSteps ? renderFavoritesRatings() : renderFavoritesRatings()
+        )}
+
+        {activeDiagram.id === 'shopping-cart' && (
+            step === totalSteps ? renderShoppingCart() : renderShoppingCart()
+        )}
+
+      </div>
+      
+      <div className="bg-slate-900 text-slate-500 text-[10px] p-1 text-center border-t border-slate-800 z-20">
+        Secuencia completa basada en las especificaciones UML.
+      </div>
+    </div>
+  );
+}
